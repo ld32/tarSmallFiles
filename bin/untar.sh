@@ -13,15 +13,15 @@ function unArchiveFolder() {
             while true; do
                 jobID=0
                 for i in $(seq 1 $core); do
-                    if `mkdir $dFolder/lock.$i 2>/dev/null`; then
+                    if `mkdir $dFolderTmp/lock.$i 2>/dev/null`; then
                         jobID=$i
                         break
                     fi
                 done
-                [ "$jobID" -eq "0" ] && sleep 10 || break
+                [ "$jobID" -eq "0" ] && sleep 1 || break
             done 
             md5sum -c ${item%.tar}.md5sum && rm ${item%.tar}.md5sum &&
-            tar xf "$item" && rm "$item" && rm -r $dFolder/lock.$jobID && echo tar xf "$item" | tee -a  $dFolder/unArchive.log || 
+            tar xf "$item" && rm "$item" && rm -r $dFolderTmp/lock.$jobID && echo tar xf "$item" | tee -a  $dFolder/unArchive.log || 
             echo Failed checksum for $item >> $dFolder/unArchive.log &
         fi
     done    
@@ -39,6 +39,10 @@ cwd=`pwd`
 core=$1
 echo untar start:  >> $dFolder/unArchive.log
 startTime=`date`
+dFolderTmp=`mktemp -d`
+
+trap "rm -r $dFolderTmp" EXIT
+
 unArchiveFolder "$dFolder"
 echo diff -r $sFolder $dFolder | tee -a $dFolder/unArchive.log
 
