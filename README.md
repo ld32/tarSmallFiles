@@ -9,12 +9,14 @@ export PATH=$PWD/tarSmallFiles/bin:$PATH
 Usage: bin/tar.sh <cores> <sourceFolder> [destinationFolder]
 
 For example:
+
 tar.sh 4 /source/dir/to/data /destination/dir/to/data
 
 ## To untar:
 Usage: untar.sh <cores> <sourceFolder> [destinationFolder]
 
 For example:
+
 untar.sh 4 /source/dir/to/data /destination/dir/to/data
 
 
