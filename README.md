@@ -6,7 +6,7 @@ git clone https://github.com/ld32/tarSmallFiles.git
 export PATH=$PWD/tarSmallFiles/bin:$PATH
 
 ## To tar:
-Usage: bin/tar.sh \<cores\> \<sourceFolder\> [destinationFolder]
+Usage: tar.sh \<cores\> \<sourceFolder\> [destinationFolder]
 
 For example:
 
