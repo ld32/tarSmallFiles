@@ -1,0 +1,1 @@
+for path in $(cat pathlist.csv); do find $path -maxdepth 1 -type d -exec sbatch -c 4 --wrap="tar.sh 4 {} ."; done
