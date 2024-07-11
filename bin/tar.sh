@@ -25,10 +25,10 @@ function archiveFiles() {
 
     local totalSize="0"
 
-    for line in `find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f-%k\n" | sort -n`; do  # %f file name, %k file size
-        local item=${line%%-*}
+    for line in `find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f----%k\n" | sort -n`; do  # %f file name, %k file size
+        local item=${line%----*}
 
-        local size=${line#*-}
+        local size=${line#*-----}
 
         [ "$size" -gt "1048576" ] && cp "$item" "$2" && continue # bigger than 1G, inore it
 
