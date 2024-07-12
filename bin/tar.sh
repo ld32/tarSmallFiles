@@ -15,9 +15,7 @@ function tarFiles() {
     local tmp=`mktemp` &&
     tar --create --preserve-permissions --file "$tmp" -T $2/$item.list.txt &&
     mv "$tmp"  "$2/$item.tar" && result=`md5sum "$2/$item.tar"` && echo "${result//$pattern/}" > $2/$item.md5sum &&
-    echo $(date) | tee -a  $dFolder/archive.log  &&
-    echo cd `pwd` >> $dFolder/archive.log  &&
-    echo tar --create --preserve-permissions --file "$2/$item.tar" -T $2/$item.list.txt | tee -a $dFolder/archive.log 
+    echo -e "$(date)\njob $3\ncd `pwd`\ntar --create --preserve-permissions --file $2/$item.tar -T $2/$item.list.txt" | tee -a $dFolder/archive.log 
 }
 
 function archiveFiles() {
@@ -37,13 +35,13 @@ function archiveFiles() {
         totalSize=$((totalSize + size))
 
         if [ "$totalSize" -gt "1048576" ]; then # bigger than 1G
-            (tarFiles "$files" "$1")
+            (tarFiles "$files" "$1" $2)
             files=""
             totalSize="0"
         fi
     done
     if [ ! -z "$files" ]; then
-        (tarFiles "$files" "$1")
+        (tarFiles "$files" "$1" $2)
     fi
 }
 
@@ -73,7 +71,7 @@ function archiveFolder() {
 
     done
     echo job $jobID 
-    (archiveFiles "$2" && rm -f $dFolderTmp/lock.$jobID  ) &  
+    (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID  ) &  
 }
 
 sFolder="$2"
