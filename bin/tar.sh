@@ -70,7 +70,7 @@ function archiveFolder() {
         [ "$jobID" -eq "0" ] && sleep 0.01 || break
 
     done
-    echo job $jobID 
+    #echo job $jobID 
     (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID  ) &  
 }
 
