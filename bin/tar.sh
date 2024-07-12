@@ -50,7 +50,7 @@ function archiveFiles() {
 function archiveFolder() {
     [ -f "$2.done" ] && echo echo tar done earlier && return
 
-    cd $1 || && echo echo folder not accessible, ignoer it: `pwd`/$1 && return
+    cd $1 || { echo echo folder not accessible, ignoer it: `pwd`/$1 && return; }
 
     mkdir -p "$2"
 
