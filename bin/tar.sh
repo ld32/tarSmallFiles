@@ -43,6 +43,7 @@ function archiveFiles() {
     if [ ! -z "$files" ]; then
         (tarFiles "$files" "$1" $2)
     fi
+    touch "$1.done" 
 }
 
 
@@ -72,7 +73,7 @@ function archiveFolder() {
         [ "$jobID" -eq "0" ] && sleep 0.01 || break
 
     done
-    (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID && touch "$2.done" ) &  
+    (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID) &  
 }
 
 sFolder="$2"
