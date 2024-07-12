@@ -9,7 +9,7 @@ function tarFiles() {
 
     local item=${files%%\\n*}-${files##*\\n}       # firstFile-lastFile
 
-    [ -f "$2/$item.tar" ] && echo done earlier && return
+    [ -f "$2/$item.tar" ] && echo tar done earlier && return
  
     echo -e "$files" > "$2/$item.list.txt"
     local tmp=`mktemp` &&
@@ -47,9 +47,11 @@ function archiveFiles() {
 
 
 function archiveFolder() {
-    mkdir -p "$2"
+    [ -f "$2.done" ] && echo echo tar done earlier && return
 
-    cd $1
+    cd $1 || && echo echo folder not accessible, ignoer it: `pwd`/$1 && return
+
+    mkdir -p "$2"
 
     for line in `find -L . -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort -n`; do
         (archiveFolder $line "$2/$line")
@@ -70,8 +72,7 @@ function archiveFolder() {
         [ "$jobID" -eq "0" ] && sleep 0.01 || break
 
     done
-    #echo job $jobID 
-    (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID  ) &  
+    (archiveFiles "$2" $jobID && rm -f $dFolderTmp/lock.$jobID && touch "$2.done" ) &  
 }
 
 sFolder="$2"

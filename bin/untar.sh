@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #set -x 
-#set -e
+set -e
 
 function unArchiveFolder() {
     cd $1
