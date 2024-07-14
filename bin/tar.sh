@@ -2,8 +2,6 @@
 #set -x
 set -e
 
-#I think you can run tests on /n/groups/htem/tier2/cb3 (but please don't actually archive it); /n/groups/htem/tier2/cb3/sections/170218121547_cb3_0293 is just one section out of ~500, and our more recent datasets are about 1000-4000 sections long. Actually the datasets in /n/groups/htem/tier2 are the ones we prepared to go on tier2 but did not happen because of IT difficulties so they could also make good case studies.
-
 function tarFiles() {
     local files=${1#\\n}                           # remove leading \n
 
@@ -23,6 +21,8 @@ function archiveFiles() {
 
     local totalSize="0"
 
+
+local line="" 
     for line in `find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f----%k\n" | sort -n`; do  # %f file name, %k file size
         local item=${line%----*}
 
@@ -53,6 +53,7 @@ function archiveFolder() {
     cd $1 || { echo echo folder not accessible, ignoer it: `pwd`/$1 && return; }
 
     mkdir -p "$2"
+local line="" 
 
     for line in `find -L . -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort -n`; do
         (archiveFolder $line "$2/$line")
