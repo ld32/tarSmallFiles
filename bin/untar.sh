@@ -1,14 +1,14 @@
 #!/bin/bash
 
 #set -x 
-set -e
+#set -e
 
 function unArchiveFolder() {
     cd $1
     pwd
     rm *.list.txt 2>/dev/null
     for item in `find . -maxdepth 1 -mindepth 1 | sort -V`; do 
-        [ -d "$item" ] && (unArchiveFolder "$item") && continue
+        [ -d "$item" ] && ( unArchiveFolder "$item" ) && continue
         if ([[ "$item" == *tar ]]); then 
             while true; do
                 jobID=0
@@ -20,9 +20,7 @@ function unArchiveFolder() {
                 done
                 [ "$jobID" -eq "0" ] && sleep 1 || break
             done 
-            { md5sum -c ${item%.tar}.md5sum && rm ${item%.tar}.md5sum && rm tar.done &&
-            tar xf "$item" && rm "$item" && rm -r $dFolderTmp/lock.$jobID && echo tar xf "$item" | tee -a  $dFolder/unArchive.log || 
-            echo Failed checksum for $item >> $dFolder/unArchive.log; } & 
+            { md5sum -c ${item%.tar}.md5sum; rm ${item%.tar}.md5sum; tar xf "$item" || echo Failed checksum for $item >> $logDir/unArchive.log; rm "$item" && rm -r $dFolderTmp/lock.$jobID; echo tar xf "$item" | tee -a  $logDir/unArchive.log;  } & 
         fi
     done    
 }
@@ -37,28 +35,40 @@ dFolder="$3"
 [ -d "$sFolder" ] || { echo "Usage: $0 <cores> <sourceFolder> <tarFolder>"; exit 1;  }
 [ -d "$dFolder" ] || { echo "Usage: $0 <cores> <sourceFolder> <tarFolder>"; exit 1;  }
 
+sFolder=`realpath $sFolder`
 dFolder=`realpath $dFolder`
+
+logDir=$dFolder/log
+
+mkdir -p $logDir
 
 cwd=`pwd`
 
-echo untar start:  >> $dFolder/unArchive.log
+echo untar start:  >> $logDir/unArchive.log
 startTime=`date`
 dFolderTmp=`mktemp -d`
 
 trap "rm -r $dFolderTmp" EXIT
 
-pids=()   
+unArchiveFolder "$dFolder" &
 
-unArchiveFolder "$dFolder"
+while true; do 
+    current_time=$(date +%s)
 
+    file_mod_time=$(stat -c %Y "$logDir/unArchive.log")
 
-wait
+    time_diff=$((current_time - file_mod_time))
+
+    [ "$time_diff" -gt 10 ] && break 
+    sleep 3
+
+done 
 
 cd $cwd
 
-echo diff -r $sFolder $dFolder | tee -a $dFolder/unArchive.log
+echo diff -r $sFolder $dFolder | tee -a $logDir/unArchive.log
 
-diff -r $sFolder $dFolder | tee -a $dFolder/unArchive.log
+diff -r $sFolder $dFolder | tee -a $logDir/unArchive.log
 
 endTime=`date`
-echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes"  | tee -a  $dFolder/unArchive.log
+echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes"  | tee -a  $logDir/unArchive.log

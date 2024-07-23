@@ -8,21 +8,21 @@ function tarFiles() {
     local item=${files%%\\n*}-${files##*\\n}       # firstFile-lastFile
 
     [ -f "$2/$item.tar" ] && echo tar done earlier: $2/$item.tar && return
- 
+    
+    pattern="/[^ ]*/"
     echo -e "$files" > "$2/$item.list.txt"
     local tmp=`mktemp` &&
     tar --create --preserve-permissions --file "$tmp" -T $2/$item.list.txt &&
     mv "$tmp"  "$2/$item.tar" && result=`md5sum "$2/$item.tar"` && echo "${result//$pattern/}" > $2/$item.md5sum &&
-    echo -e "\njob $3\n$(date)\ncd `pwd`\ntar --create --preserve-permissions --file $2/$item.tar -T $2/$item.list.txt" | tee -a $dFolder/archive.log 
+    echo -e "\njob $3\n$(date)\ncd `pwd`\ntar --create --preserve-permissions --file $2/$item.tar -T $2/$item.list.txt" | tee -a $logDir/archive.log 
 }
 
 function archiveFiles() {
-    [ -f "$dFolder/log/${1//\/}.done" ] && echo echo tar done earlier for folder: $1 && return
+    [ -f "$dlogDir/${1//\/}.done" ] && echo echo tar done earlier for folder: $1 && return
      
     local files=""
 
     local totalSize=0
-
 
     local line="" 
     for line in `find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f----%k\n" | sort -n`; do  # %f file name, %k file size
@@ -45,7 +45,7 @@ function archiveFiles() {
     if [ ! -z "$files" ]; then
         tarFiles "$files" "$1" $2
     fi
-    touch "$dFolder/log/${1//\/}.done" 
+    touch "$logDir/${1//\/}.done" 
 }
 
 function archiveFolder() {
@@ -53,7 +53,7 @@ function archiveFolder() {
     cd $1 || { echo folder not accessible, ignoer it: `pwd`/$1 && return; }
 
     if [[ "$action" == scan ]]; then 
-        echo `pwd` | tee -a $dFolder/folders.txt
+        echo `pwd` | tee -a $logDir/folders.txt
     else 
         mkdir -p "$2"
     fi 
@@ -88,7 +88,6 @@ function archiveFolder() {
 # script is sourced, so only source the bash functions
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return  
 
-
 date
 echo Running: $0 $@
 
@@ -101,14 +100,18 @@ dFolder=`realpath $3`
 action="$4" 
 
 usage() {
-    echo "Usage: $0 <nJobs> <sourceFolder> <destinationFolder> <action: singleNode/scan/sbatch>"; exit 1;
+    echo "Usage: $0 <nJobs> <sourceFolder> <destinationFolder> <action: singleNode/scan/sbatch/esbatch>"; exit 1;
 }
 
 [ ! -d "$sFolder" ] && echo Source folder not exist: $sFolder && usage
 
-[[ "$action" == scan ]] || [[ "$action" == singleNode ]] || [[ "$action" == sbatch ]] || { echo action wrong: $action; usage; }
+[[ "$action" == scan ]] || [[ "$action" == singleNode ]] || [[ "$action" == sbatch ]] || [[ "$action" == esbatch ]] || { echo action wrong: $action; usage; }
 
-mkdir -p $dFolder/log
+logDir=$dFolder/log
+
+mkdir -p $logDir
+
+rm -r $logDir/exclusive 2>/dev/null || true 
 
 dFolderTmp=`mktemp -d`
 
@@ -116,42 +119,137 @@ trap "rm -r $dFolderTmp" EXIT
 
 startTime=`date`
 
-pattern="/[^ ]*/"
 if [[ "$action" == sbatch ]]; then 
-    [ -f $dFolder/folders.txt ] || $(dirname $0)/tar.sh 2 $sFolder $dFolder scan
-    x=$(wc -l < $dFolder/folders.txt)  
+    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 2 $sFolder $dFolder scan
+    x=$(wc -l < $logDir/folders.txt)  
     rows_per_job=$(( x / $nJobs ))
-    echo "#!/bin/bash" > $dFolder/array.sh 
-    echo "#SBATCH --array=1-$nJobs" >> $dFolder/array.sh 
-    echo "#SBATCH --output=slurm_%A_%a.out" >> $dFolder/array.sh  
-    echo "#SBATCH --error=slurm_%A_%a.out" >> $dFolder/array.sh  
-    echo >> $dFolder/array.sh
-    echo "set -e" >> $dFolder/array.sh 
-    echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $dFolder/array.sh 
-    echo dFolder=$dFolder >> $dFolder/array.sh
-    echo "start_row=\$(( (SLURM_ARRAY_TASK_ID - 1) * $rows_per_job + 1 ))" >> $dFolder/array.sh 
-    echo "end_row=\$(( SLURM_ARRAY_TASK_ID * $rows_per_job ))"  >> $dFolder/array.sh 
-    echo "[ \$SLURM_ARRAY_TASK_ID -eq $nJobs ] && end_row=$x"  >> $dFolder/array.sh 
-    echo "sed -n \"\${start_row},\${end_row}p\" $dFolder/folders.txt " >> $dFolder/array.sh
-    echo "source $0" >> $dFolder/array.sh
-    echo "sed -n \"\${start_row},\${end_row}p\" $dFolder/folders.txt  | while IFS= read -r line; do" >> $dFolder/array.sh 
-    echo "  cd \$line" >> $dFolder/array.sh
-    echo "  mkdir -p $dFolder\${line#$sFolder}" >> $dFolder/array.sh
+    echo "#!/bin/bash" > $logDir/array.sh 
+    echo "#SBATCH --array=1-$nJobs" >> $logDir/array.sh 
+    echo "#SBATCH --output=slurm_%A_%a.out" >> $logDir/array.sh  
+    echo "#SBATCH --error=slurm_%A_%a.out" >> $logDir/array.sh  
+    echo >> $logDir/array.sh
+    echo "set -e" >> $logDir/array.sh 
+    echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
+
+    echo dFolder=$dFolder >> $logDir/array.sh
+    echo logDir=$logDir >> $logDir/array.sh
+
+    echo "start_row=\$(( (SLURM_ARRAY_TASK_ID - 1) * $rows_per_job + 1 ))" >> $logDir/array.sh 
+    echo "end_row=\$(( SLURM_ARRAY_TASK_ID * $rows_per_job ))"  >> $logDir/array.sh 
+    echo "[ \$SLURM_ARRAY_TASK_ID -eq $nJobs ] && end_row=$x"  >> $logDir/array.sh 
+    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/array.sh
+    echo "source $0" >> $logDir/array.sh
+    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/array.sh 
+    echo "  cd \$line" >> $logDir/array.sh
+    echo "  mkdir -p $dFolder\${line#$sFolder}" >> $logDir/array.sh
         
-    echo "  archiveFiles $dFolder\${line#$sFolder} \$SLURM_ARRAY_TASK_ID" >> $dFolder/array.sh 
-    #echo "  exit" >> $dFolder/array.sh
-    echo done >> $dFolder/array.sh 
-    echo echo done >> $dFolder/array.sh 
-    cat $dFolder/array.sh
+    echo "  archiveFiles $dFolder\${line#$sFolder} \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
+    #echo "  exit" >> $logDir/array.sh
+    echo done >> $logDir/array.sh 
+    echo echo done >> $logDir/array.sh 
+    cat $logDir/array.sh
     
     #export SLURM_ARRAY_TASK_ID=1
     #sh $dFolder/array.sh
-    [[ "$SLURM_CLUSTER_NAME" = o2-dev ]] && acc="-A rccg"
-    sbatch $acc -t 2:0:0 -p short --ntasks-per-node=1 --spread-job --mem 10G $dFolder/array.sh
-else        
-    pids=()         
+    #[[ "$SLURM_CLUSTER_NAME" = o2-dev ]] && acc="-A rccg"
+    sbatch -A rccg -t 2:0:0 -p short --mem 2G $logDir/array.sh
+
+elif [[ "$action" == esbatch ]]; then 
+    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 2 $sFolder $dFolder scan
+
+    x=$(wc -l < $logDir/folders.txt)  
+    rows_per_job=$(( x / $nJobs ))
+    echo "#!/bin/bash" > $logDir/job.sh 
+    echo "#SBATCH --output=slurm_%j.out" >> $logDir/job.sh  
+    echo "#SBATCH --error=slurm_%j.out" >> $logDir/job.sh  
+    echo >> $logDir/job.sh
+    echo "set -e" >> $logDir/job.sh 
+    echo "jIndex=\$1" >> $logDir/job.sh
+
+    echo "echo job index: \$jIndex" >> $logDir/job.sh 
+
+    echo dFolder=$dFolder >> $logDir/job.sh
+    echo logDir=$logDir >> $logDir/job.sh
+    echo "start_row=\$(( (jIndex - 1) * $rows_per_job + 1 ))" >> $logDir/job.sh 
+    echo "end_row=\$(( jIndex * $rows_per_job ))"  >> $logDir/job.sh 
+    echo "[ \$jIndex -eq $nJobs ] && end_row=$x"  >> $logDir/job.sh 
+    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/job.sh
+    echo "source $0" >> $logDir/job.sh
+    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/job.sh 
+    echo "  cd \$line" >> $logDir/job.sh
+    echo "  mkdir -p $dFolder\${line#$sFolder}" >> $logDir/job.sh
+        
+    echo "  archiveFiles $dFolder\${line#$sFolder} \$jIndex" >> $logDir/job.sh 
+    #echo "  exit" >> $logDir/job.sh
+    echo done >> $logDir/job.sh 
+    echo echo done >> $logDir/job.sh  
+
+    echo "while ! mkdir $logDir/exclusive 2>/dev/null; do" >> $logDir/job.sh 
+    echo "  sleep \$((1 + RANDOM % 10))" >> $logDir/job.sh 
+    echo "done" >> $logDir/job.sh 
+
+    echo "cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
+
+    echo "sed -i \"s/^o\${SLURM_JOB_NODELIST}/\${SLURM_JOB_NODELIST}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
+    echo "sed -i \"s/spaceHolder\${SLURM_JOB_ID}/; done \$(date '+%m-%d %H:%M:%S')/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
+    echo "cat $logDir/sbtachExclusivceLog.txt >&2 " >> $logDir/job.sh 
+
+    #echo "set -x " >> $logDir/job.sh 
+    echo "IFS=$'\n'" >> $logDir/job.sh 
+    echo "for line in \`grep '^hold' $logDir/sbtachExclusivceLog.txt | grep -v unhold\`; do " >> $logDir/job.sh 
+    echo "  job=\${line##* }; p=\`echo \$line | cut -d' ' -f2\`" >> $logDir/job.sh 
+    echo "  node=\`grep '^com' $logDir/sbtachExclusivceLog.txt | grep \$p | head -n1 | tr -s \" \" | cut -f1 | cut -d' ' -f1\`" >> $logDir/job.sh 
+    echo "  if [ -z \"\$node\" ]; then " >> $logDir/job.sh 
+    echo "      break" >> $logDir/job.sh 
+    echo "  else " >> $logDir/job.sh 
+    echo "      scontrol update JobID=\$job NodeList=\$node" >> $logDir/job.sh 
+    echo "      scontrol release JobID=\$job" >> $logDir/job.sh 
+    echo "      sed -i \"s/^\${node}/o\${node}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
+    echo "      sed -i \"s/\${job}/\${job}; unhold onto: \$node by job: \${SLURM_JOB_ID} \$(date '+%m-%d %H:%M:%S')spaceHolder\${job}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh  
+    echo "  fi " >> $logDir/job.sh 
+    echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
+    echo "done " >> $logDir/job.sh 
+    echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
+    #cat $logDir/job.sh 
+    
+    [ -f $logDir/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep  idle | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
+    
+    #set -x 
+    for i in `seq 1 $nJobs`; do 
+        
+        #cmd="sh $logDir/job.sh $p 0" 
+        node=`grep '^com' $logDir/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
+        
+        if [ -z "$node" ]; then
+            cmd="sbatch -A rccg -t 2:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+            output="$($cmd)" || output="$(eval $cmd)"
+            #scontrol hold ${output##* }
+            echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
+        else
+            cmd="sbatch -w $node -A rccg -t 2:0:0 -p short --mem 2G $logDir/job.sh $i" 
+            output="$($cmd)" || output="$(eval $cmd)"
+            sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
+            echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
+            cat $logDir/sbtachExclusivceLog.txt >&2
+        fi
+    done
+    #set +x         
+else 
     archiveFolder "$sFolder" "$dFolder"
-    wait
-    endTime=`date`
-    echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes" | tee -a $dFolder/archive.log
-fi 
+    
+    while true; do 
+        current_time=$(date +%s)
+
+        file_mod_time=$(stat -c %Y "$logDir/archive.log")
+
+        time_diff=$((current_time - file_mod_time))
+
+        [ "$time_diff" -gt 10 ] && break 
+        
+        sleep 3
+    done 
+fi
+
+endTime=`date`
+
+echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes" | tee -a $logDir/archive.log

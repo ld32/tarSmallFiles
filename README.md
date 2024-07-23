@@ -6,7 +6,7 @@ git clone https://github.com/ld32/tarSmallFiles.git
 export PATH=$PWD/tarSmallFiles/bin:$PATH
 
 ## To tar:
-Usage: tar.sh \<nJobs\> \<sourceFolder\> <destinationFolder> <action: singleNode/scan/sbatch> [destinationFolder]
+Usage: tar.sh \<nJobs\> \<sourceFolder\> <destinationFolder> <action: singleNode/scan/sbatch/esbatch> 
 
 For example:
 
@@ -18,6 +18,7 @@ Usage: untar.sh \<cores\> \<sourceFolder\> <destinationFolder>
 For example:
 
 untar.sh 4 /source/dir/to/data /destination/dir/to/data
+
 
 
 
