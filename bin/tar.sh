@@ -240,12 +240,13 @@ else
     while true; do 
         current_time=$(date +%s)
 
-        file_mod_time=$(stat -c %Y "$logDir/archive.log")
+        if [ -f $logDir/archive.log ]; then 
+            file_mod_time=$(stat -c %Y "$logDir/archive.log")
 
-        time_diff=$((current_time - file_mod_time))
+            time_diff=$((current_time - file_mod_time))
 
-        [ "$time_diff" -gt 10 ] && break 
-        
+            [ "$time_diff" -gt 10 ] && break 
+        fi
         sleep 3
     done 
 fi
