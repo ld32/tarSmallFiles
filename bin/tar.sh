@@ -130,7 +130,7 @@ if [[ "$action" == sbatch ]]; then
     echo >> $logDir/array.sh
     echo "set -e" >> $logDir/array.sh 
     echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
-
+    echo "echo start time \$(date)" >> $logDir/array.sh
     echo dFolder=$dFolder >> $logDir/array.sh
     echo logDir=$logDir >> $logDir/array.sh
 
@@ -146,7 +146,9 @@ if [[ "$action" == sbatch ]]; then
     echo "  archiveFiles $dFolder\${line#$sFolder} \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
     #echo "  exit" >> $logDir/array.sh
     echo done >> $logDir/array.sh 
-    echo echo done >> $logDir/array.sh 
+    echo echo done >> $logDir/array.sh
+    echo "echo end time \$(date)" >> $logDir/array.sh
+    
     cat $logDir/array.sh
     
     #export SLURM_ARRAY_TASK_ID=1
@@ -167,7 +169,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "jIndex=\$1" >> $logDir/job.sh
 
     echo "echo job index: \$jIndex" >> $logDir/job.sh 
-
+    echo "echo start time \$(date)" >> $logDir/job.sh 
     echo dFolder=$dFolder >> $logDir/job.sh
     echo logDir=$logDir >> $logDir/job.sh
     echo "start_row=\$(( (jIndex - 1) * $rows_per_job + 1 ))" >> $logDir/job.sh 
@@ -210,6 +212,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
     echo "done " >> $logDir/job.sh 
     echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
+    echo "echo end time \$(date)" >> $logDir/job.sh 
     #cat $logDir/job.sh 
     
     [ -f $logDir/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep  idle | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
