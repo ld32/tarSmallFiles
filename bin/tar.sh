@@ -235,6 +235,7 @@ elif [[ "$action" == esbatch ]]; then
     done
     #set +x         
 else 
+    # scan or singleNode
     archiveFolder "$sFolder" "$dFolder"
     
     while true; do 
