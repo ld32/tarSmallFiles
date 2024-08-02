@@ -6,7 +6,7 @@ git clone https://github.com/ld32/tarSmallFiles.git
 export PATH=$PWD/tarSmallFiles/bin:$PATH
 
 ## To tar:
-Usage: tar.sh \<nJobs\> \<sourceFolder\> <destinationFolder> <action: singleNode/scan/sbatch/esbatch> 
+Usage: tar.sh \<nJobs\> \<sourceFolder\> \<destinationFolder\> <action: singleNode/scan/sbatch/esbatch> 
 
 For example:
 
