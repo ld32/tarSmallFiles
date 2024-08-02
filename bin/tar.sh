@@ -249,7 +249,7 @@ else
 
             time_diff=$((current_time - file_mod_time))
 
-            [ "$time_diff" -gt 10 ] && break 
+            [ "$time_diff" -gt 60 ] && break 
         fi
         sleep 3
     done 
