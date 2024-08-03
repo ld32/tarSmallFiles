@@ -53,12 +53,8 @@ function archiveFolder() {
     
     cd $1 || { echo folder not accessible, ignoer it: `pwd`/$1 && return; }
 
-    if [[ "$action" == scan ]]; then 
-        echo `pwd` | tee -a $logDir/folders.txt
-    else 
-        mkdir -p "$2"
-    fi 
-
+    mkdir -p "$2"
+    
     local line="" 
     for line in `find -L . -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | sort -n`; do
         ( archiveFolder $line "$2/$line" )
@@ -106,8 +102,6 @@ usage() {
 
 [ ! -d "$sFolder" ] && echo Source folder not exist: $sFolder && usage
 
-[[ "$action" == scan ]] || [[ "$action" == singleNode ]] || [[ "$action" == sbatch ]] || [[ "$action" == esbatch ]] || { echo action wrong: $action; usage; }
-
 logDir=$dFolder/log
 
 mkdir -p $logDir
@@ -131,7 +125,7 @@ if [[ "$action" == sbatch ]]; then
     echo >> $logDir/array.sh
     echo "set -e" >> $logDir/array.sh 
     echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
-    echo "echo start time \$(date)" >> $logDir/array.sh
+    echo "echo \$SLURM_ARRAY_TASK_ID start time \$(date) >> $logDir/runTime.txt" >> $logDir/array.sh
     echo dFolder=$dFolder >> $logDir/array.sh
     echo logDir=$logDir >> $logDir/array.sh
 
@@ -148,7 +142,7 @@ if [[ "$action" == sbatch ]]; then
     #echo "  exit" >> $logDir/array.sh
     echo done >> $logDir/array.sh 
     echo echo done >> $logDir/array.sh
-    echo "echo end time \$(date)" >> $logDir/array.sh
+    echo "echo \$SLURM_ARRAY_TASK_ID end time \$(date) >> $logDir/runTime.txt" >> $logDir/array.sh
     
     cat $logDir/array.sh
     
@@ -170,7 +164,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "jIndex=\$1" >> $logDir/job.sh
 
     echo "echo job index: \$jIndex" >> $logDir/job.sh 
-    echo "echo start time \$(date)" >> $logDir/job.sh 
+    echo "echo \$jIndex start time \$(date) >> $logDir/runTime.txt" >> $logDir/job.sh 
     echo dFolder=$dFolder >> $logDir/job.sh
     echo logDir=$logDir >> $logDir/job.sh
     echo "start_row=\$(( (jIndex - 1) * $rows_per_job + 1 ))" >> $logDir/job.sh 
@@ -213,7 +207,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
     echo "done " >> $logDir/job.sh 
     echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
-    echo "echo end time \$(date)" >> $logDir/job.sh 
+    echo "echo \$jIndex end time \$(date) >> $logDir/runTime.txt" >> $logDir/job.sh 
     #cat $logDir/job.sh 
     
     [ -f $logDir/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
@@ -238,24 +232,34 @@ elif [[ "$action" == esbatch ]]; then
 
     done
     cat $logDir/sbtachExclusivceLog.txt >&2
-    #set +x         
-else 
-    # scan or singleNode
+            
+elif [[ "$action" == scan ]]; then 
+    
+    echo Scan start `date` | tee -a $logDir/runTime.txt 
+    
+    find -L "$sFolder" -type d -exec realpath {} \; | tee -a $logDir/folders.txt
+    
+    cat $logDir/folders.txt >> $logDir/runTime.txt
+
+    echo Scan end `date` | tee -a $logDir/runTime.txt 
+     
+elif [[ "$action" == singleNode ]]; then    
+
     archiveFolder "$sFolder" "$dFolder"
     
-    if [[ "$action" == singleNode ]]; then   
-        while true; do   
-            if [ -f $logDir/archive.log ]; then 
-                current_time=$(date +%s)
-                file_mod_time=$(stat -c %Y "$logDir/archive.log")
+    while true; do   
+        if [ -f $logDir/archive.log ]; then 
+            current_time=$(date +%s)
+            file_mod_time=$(stat -c %Y "$logDir/archive.log")
 
-                time_diff=$((current_time - file_mod_time))
+            time_diff=$((current_time - file_mod_time))
 
-                [ "$time_diff" -gt 60 ] && break 
-            fi
-            sleep 3
-        done
-    fi     
+            [ "$time_diff" -gt 60 ] && break 
+        fi
+        sleep 60
+    done
+else 
+    echo action wrong: $action; usage;
 fi
 
 endTime=`date`
