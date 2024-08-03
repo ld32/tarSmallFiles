@@ -115,7 +115,7 @@ trap "rm -r $dFolderTmp" EXIT
 startTime=`date`
 
 if [[ "$action" == sbatch ]]; then 
-    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 2 $sFolder $dFolder scan
+    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 1 $sFolder $dFolder scan
     x=$(wc -l < $logDir/folders.txt)  
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/array.sh 
@@ -135,7 +135,7 @@ if [[ "$action" == sbatch ]]; then
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/array.sh
     echo "source $0" >> $logDir/array.sh
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/array.sh 
-    echo "  cd \$line" >> $logDir/array.sh
+    echo "  cd \$line || continue" >> $logDir/array.sh
     echo "  mkdir -p $dFolder\${line#$sFolder}" >> $logDir/array.sh
         
     echo "  archiveFiles $dFolder\${line#$sFolder} \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
@@ -149,10 +149,10 @@ if [[ "$action" == sbatch ]]; then
     #export SLURM_ARRAY_TASK_ID=1
     #sh $dFolder/array.sh
     #[[ "$SLURM_CLUSTER_NAME" = o2-dev ]] && acc="-A rccg"
-    sbatch -A rccg -t 2:0:0 -p short --mem 2G $logDir/array.sh
+    sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
 
 elif [[ "$action" == esbatch ]]; then 
-    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 2 $sFolder $dFolder scan
+    [ -f $logDir/folders.txt ] || $(dirname $0)/tar.sh 1 $sFolder $dFolder scan
 
     x=$(wc -l < $logDir/folders.txt)  
     rows_per_job=$(( x / $nJobs ))
@@ -173,7 +173,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/job.sh
     echo "source $0" >> $logDir/job.sh
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/job.sh 
-    echo "  cd \$line" >> $logDir/job.sh
+    echo "  cd \$line || continue" >> $logDir/job.sh
     echo "  mkdir -p $dFolder\${line#$sFolder}" >> $logDir/job.sh
         
     echo "  archiveFiles $dFolder\${line#$sFolder} \$jIndex" >> $logDir/job.sh 
@@ -219,12 +219,12 @@ elif [[ "$action" == esbatch ]]; then
         node=`grep '^com' $logDir/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         if [ -z "$node" ]; then
-            cmd="sbatch -A rccg -t 2:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -A rccg -t 12:0:0 -H -p short --mem 4G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             #scontrol hold ${output##* }
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
         else
-            cmd="sbatch -w $node -A rccg -t 2:0:0 -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -w $node -A rccg -t 12:0:0 -p short --mem 4G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
