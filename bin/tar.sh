@@ -228,17 +228,16 @@ elif [[ "$action" == esbatch ]]; then
             cmd="sbatch -A rccg -t 2:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             #scontrol hold ${output##* }
-            echo $output 
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
         else
             cmd="sbatch -w $node -A rccg -t 2:0:0 -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
-            echo $output 
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
-            cat $logDir/sbtachExclusivceLog.txt >&2
         fi
+
     done
+    cat $logDir/sbtachExclusivceLog.txt >&2
     #set +x         
 else 
     # scan or singleNode
