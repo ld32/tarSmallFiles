@@ -228,10 +228,12 @@ elif [[ "$action" == esbatch ]]; then
             cmd="sbatch -A rccg -t 2:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             #scontrol hold ${output##* }
+            echo $output 
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
         else
             cmd="sbatch -w $node -A rccg -t 2:0:0 -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
+            echo $output 
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
             cat $logDir/sbtachExclusivceLog.txt >&2
@@ -242,18 +244,19 @@ else
     # scan or singleNode
     archiveFolder "$sFolder" "$dFolder"
     
-    [[ "$action" == scan ]] && exit   
-    while true; do   
-        if [ -f $logDir/archive.log ]; then 
-            current_time=$(date +%s)
-            file_mod_time=$(stat -c %Y "$logDir/archive.log")
+    if [[ "$action" == singleNode ]]; then   
+        while true; do   
+            if [ -f $logDir/archive.log ]; then 
+                current_time=$(date +%s)
+                file_mod_time=$(stat -c %Y "$logDir/archive.log")
 
-            time_diff=$((current_time - file_mod_time))
+                time_diff=$((current_time - file_mod_time))
 
-            [ "$time_diff" -gt 60 ] && break 
-        fi
-        sleep 3
-    done
+                [ "$time_diff" -gt 60 ] && break 
+            fi
+            sleep 3
+        done
+    fi     
 fi
 
 endTime=`date`
