@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #set -x
 set -e
 
@@ -241,10 +242,10 @@ else
     # scan or singleNode
     archiveFolder "$sFolder" "$dFolder"
     
-    while true; do 
-        current_time=$(date +%s)
-
+    [[ "$action" == scan ]] && exit   
+    while true; do   
         if [ -f $logDir/archive.log ]; then 
+            current_time=$(date +%s)
             file_mod_time=$(stat -c %Y "$logDir/archive.log")
 
             time_diff=$((current_time - file_mod_time))
@@ -252,7 +253,7 @@ else
             [ "$time_diff" -gt 60 ] && break 
         fi
         sleep 3
-    done 
+    done
 fi
 
 endTime=`date`
