@@ -216,7 +216,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "echo end time \$(date)" >> $logDir/job.sh 
     #cat $logDir/job.sh 
     
-    [ -f $logDir/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep  idle | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
+    [ -f $logDir/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
     
     #set -x 
     for i in `seq 1 $nJobs`; do 
