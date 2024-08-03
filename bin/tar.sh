@@ -104,7 +104,7 @@ usage() {
 
 logDir=$dFolder/log
 
-mkdir -p $logDir
+mkdir -p $logDir log
 
 rm -r $logDir/exclusive 2>/dev/null || true 
 
@@ -120,8 +120,8 @@ if [[ "$action" == sbatch ]]; then
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/array.sh 
     echo "#SBATCH --array=1-$nJobs" >> $logDir/array.sh 
-    echo "#SBATCH --output=slurm_%A_%a.out" >> $logDir/array.sh  
-    echo "#SBATCH --error=slurm_%A_%a.out" >> $logDir/array.sh  
+    echo "#SBATCH --output=log/slurm_%A_%a.out" >> $logDir/array.sh  
+    echo "#SBATCH --error=log/slurm_%A_%a.out" >> $logDir/array.sh  
     echo >> $logDir/array.sh
     echo "set -e" >> $logDir/array.sh 
     echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
@@ -157,8 +157,7 @@ elif [[ "$action" == esbatch ]]; then
     x=$(wc -l < $logDir/folders.txt)  
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/job.sh 
-    echo "#SBATCH --output=slurm_%j.out" >> $logDir/job.sh  
-    echo "#SBATCH --error=slurm_%j.out" >> $logDir/job.sh  
+      
     echo >> $logDir/job.sh
     echo "set -e" >> $logDir/job.sh 
     echo "jIndex=\$1" >> $logDir/job.sh
@@ -219,17 +218,16 @@ elif [[ "$action" == esbatch ]]; then
         node=`grep '^com' $logDir/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         if [ -z "$node" ]; then
-            cmd="sbatch -A rccg -t 12:0:0 -H -p short --mem 4G $logDir/job.sh $i" 
+            cmd="sbatch -A rccg -o log/tarLog.$i.txt -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             #scontrol hold ${output##* }
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
         else
-            cmd="sbatch -w $node -A rccg -t 12:0:0 -p short --mem 4G $logDir/job.sh $i" 
+            cmd="sbatch -w $node -A rccg -o log/tarLog.$i.txt -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
             output="$($cmd)" || output="$(eval $cmd)"
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
         fi
-
     done
     cat $logDir/sbtachExclusivceLog.txt >&2
             
