@@ -242,7 +242,7 @@ elif [[ "$action" == scan ]]; then
     echo Scan end `date` | tee -a $logDir/runTime.txt 
      
 elif [[ "$action" == singleNode ]]; then    
-    echo start time $(date) >> $logDir/runTime.txt
+    echo 0 start time $(date) >> $logDir/runTime.txt
     archiveFolder "$sFolder" "$dFolder"
     
     while true; do   
@@ -256,7 +256,7 @@ elif [[ "$action" == singleNode ]]; then
         fi
         sleep 60
     done
-    echo end time $(date) >> $logDir/runTime.txt
+    echo 0 end time $(date) >> $logDir/runTime.txt
 else 
     echo action wrong: $action; usage;
 fi
