@@ -38,9 +38,9 @@ dFolder="$3"
 sFolder=`realpath $sFolder`
 dFolder=`realpath $dFolder`
 
-logDir=$dFolder/log
+logDir=$dFolder-log
 
-mkdir -p $logDir
+mkdir -p $dFolder $logDir
 
 cwd=`pwd`
 
