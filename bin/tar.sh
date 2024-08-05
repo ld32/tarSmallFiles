@@ -101,7 +101,7 @@ usage() {
 
 logDir=$dFolder-log
 
-mkdir -p $logDir
+mkdir -p $dFolder $logDir
 
 rm -r $logDir/exclusive 2>/dev/null || true 
 
