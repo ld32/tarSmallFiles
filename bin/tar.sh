@@ -147,7 +147,7 @@ elif [[ "$action" == sbatch ]]; then
 
     x=$(wc -l < $logDir/folders.txt) 
     [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs 1 > $logDir/runTime.txt
+    echo nJobs $nJobs > $logDir/runTime.txt
 
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/array.sh 
@@ -190,7 +190,7 @@ elif [[ "$action" == esbatch ]]; then
 
     x=$(wc -l < $logDir/folders.txt)  
     [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs 1 > $logDir/runTime.txt
+    echo nJobs $nJobs > $logDir/runTime.txt
 
     rows_per_job=$(( x / $nJobs ))
     
