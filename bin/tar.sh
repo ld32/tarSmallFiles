@@ -248,7 +248,7 @@ elif [[ "$action" == esbatch ]]; then
     echo Slurm script:
     cat $logDir/job.sh 
     
-    sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | cut -d ' ' -f 1,2 | datamash -W groupby 1 collapse 2 > $logDir/sbtachExclusivceLog.txt
+    sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | cut -d ' ' -f 1,2 > $logDir/sbtachExclusivceLog.txt
     
     #set -x 
     for i in `seq 1 $nJobs`; do 
