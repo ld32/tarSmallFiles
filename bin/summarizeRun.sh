@@ -54,6 +54,8 @@ done < $1-log/runTime.txt
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+count=0
 # Print the runtime for each job in minutes
 for job_id in `seq 1 $nJobs`; do
     runtime_seconds=${job_runtimes[$job_id]}
@@ -64,8 +66,9 @@ for job_id in `seq 1 $nJobs`; do
     fi 
     runtime_minutes=$((runtime_seconds / 60))
     echo "Job $job_id runtime: $runtime_minutes minutes or ($runtime_seconds seconds)"
+    count=$((count+1))
 done
 
 # Convert total runtime to minutes and print it
-total_runtime_minutes=$((total_runtime / 60 / nJobs))
-echo "Total runtime: $total_runtime_minutes minutes or ($((total_runtime/nJobs)) seconds)"
+total_runtime_minutes=$((total_runtime / 60 / count))
+echo "Total runtime: $total_runtime_minutes minutes or ($((total_runtime/count)) seconds)"
