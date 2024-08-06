@@ -103,6 +103,10 @@ logDir=$dFolder-log
 
 mkdir -p $dFolder $logDir
 
+[ -f $dFolder/runStarted.lock ] && echo A run was started earlier on the folder. Before re-submitting, please make sure all jobs from that run are finished, then manually delete $dFolder/runStarted.lock"; exit 1; }
+
+touch $dFolder/runStarted.lock 
+
 rm -r $logDir/exclusive 2>/dev/null || true 
 
 dFolderTmp=`mktemp -d`
@@ -160,6 +164,7 @@ elif [[ "$action" == sbatch ]]; then
     echo "echo \$SLURM_ARRAY_TASK_ID start time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
     echo dFolder=$dFolder >> $logDir/array.sh
     echo logDir=$logDir >> $logDir/array.sh
+    echo pwd=\$PWD >> $logDir/array.sh
 
     echo "start_row=\$(( (SLURM_ARRAY_TASK_ID - 1) * $rows_per_job + 1 ))" >> $logDir/array.sh 
     echo "end_row=\$(( SLURM_ARRAY_TASK_ID * $rows_per_job ))"  >> $logDir/array.sh 
@@ -175,6 +180,8 @@ elif [[ "$action" == sbatch ]]; then
     echo done >> $logDir/array.sh 
     echo echo done >> $logDir/array.sh
     echo "echo \$SLURM_ARRAY_TASK_ID end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
+    echo "cd $pwd" >> $logDir/array.sh
+    echo "summarizeRun.sh | mail -s "\${dFolder##*/}/\$SLURM_ARRAY_TASK_ID is done\" $USER" >> $logDir/array.sh
     
     echo Slurm script:
     cat $logDir/array.sh
@@ -214,9 +221,11 @@ elif [[ "$action" == esbatch ]]; then
     echo "  archiveFiles $dFolder\${line#$sFolder} \$jIndex" >> $logDir/job.sh 
     #echo "  exit" >> $logDir/job.sh
     echo done >> $logDir/job.sh 
-    echo echo done >> $logDir/job.sh  
-
+    echo echo done >> $logDir/job.sh
+    
     echo "echo \$jIndex end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/job.sh 
+    
+    echo "summarizeRun.sh | mail -s "\${dFolder##*/}/\$jIndex/\$SLURM_JOBID is done\" $USER" >> $logDir/job.sh
     
     echo "while ! mkdir $logDir/exclusive 2>/dev/null; do" >> $logDir/job.sh 
     echo "  sleep \$((1 + RANDOM % 10))" >> $logDir/job.sh 
