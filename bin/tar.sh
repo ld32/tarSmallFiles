@@ -103,11 +103,19 @@ logDir=$dFolder-log
 
 mkdir -p $dFolder $logDir
 
-[ -f $logDir/runStarted.lock ] && { echo A run was started earlier on the folder. Before re-submitting, please make sure all jobs from that run are finished, then manually delete $logDir/runStarted.lock; exit 1; }
+notDone=''
+if [ -f $logDir/allJobs.txt ]; then 
+    IFS=$'\n'; out=`squeue -u $USER -t PD,R -o "%.18i"`
+    if [ ! -z "$out" ]; then 
+        for line in `cat $logDir/allJobs.txt`; do
+            [[ "$out" == *$line* ]] && notDone="$line $notDone"
+        done 
+    fi     
+fi 
 
-touch $logDir/runStarted.lock 
+[ -z "$notDone" ] || { echo -e "A run was started earlier on the folder and the folowing jobs are still pending or running\nPlease wait for them to finish or cancel them:\n$notDone"; exit 1; }
 
-rm -r $logDir/exclusive 2>/dev/null || true 
+rm -r $logDir/exclusive $logDir/allJobs.txt  2>/dev/null || true 
 
 dFolderTmp=`mktemp -d`
 
@@ -155,6 +163,8 @@ elif [[ "$action" == sbatch ]]; then
 
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/array.sh 
+    echo >> $logDir/array.sh 
+    echo "#SBATCH -J ${dFolder##*/}._%A_%a" >> $logDir/array.sh 
     echo "#SBATCH --array=1-$nJobs" >> $logDir/array.sh 
     echo "#SBATCH --output=$logDir/slurm_%A_%a.out" >> $logDir/array.sh  
     echo "#SBATCH --error=$logDir/slurm_%A_%a.out" >> $logDir/array.sh  
@@ -181,6 +191,7 @@ elif [[ "$action" == sbatch ]]; then
     echo "echo \$SLURM_ARRAY_TASK_ID end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
 
     echo "echo -e \"Subject: ${dFolder##*/}/\$SLURM_ARRAY_TASK_ID is done\n\`summarizeRun.sh $dFolder\`\" | sendmail `head -n 1 ~/.forward` " >> $logDir/array.sh
+    echo sleep 100  >> $logDir/array.sh
 
     echo Slurm script:
     cat $logDir/array.sh
@@ -189,7 +200,9 @@ elif [[ "$action" == sbatch ]]; then
     #sh $dFolder/array.sh
     #[[ "$SLURM_CLUSTER_NAME" = o2-dev ]] && acc="-A rccg"
     echo sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
-    sbatch -A rccg -J ${dFolder##*/} -t 12:0:0 -p short --mem 4G $logDir/array.sh
+    output=`sbatch -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
+    echo ${output##* } >> $logDir/allJobs.txt
+    echo $output
 
 elif [[ "$action" == esbatch ]]; then 
     [ ! -f $logDir/folders.txt ] && $(dirname $0)/tar.sh 1 $sFolder $dFolder scan || echo Folder scan is done earlier
@@ -252,6 +265,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
     echo "done " >> $logDir/job.sh 
     echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
+    echo sleep 100 >> $logDir/job.sh 
     
     echo Slurm script:
     cat $logDir/job.sh 
@@ -270,12 +284,14 @@ elif [[ "$action" == esbatch ]]; then
             output="$($cmd)" || output="$(eval $cmd)"
             #scontrol hold ${output##* }
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
+            echo ${output##* } >> $logDir/allJobs.txt
         else
             cmd="sbatch -w $node -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
             echo $cmd 
             output="$($cmd)" || output="$(eval $cmd)"
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
+            echo ${output##* } >> $logDir/allJobs.txt
         fi
     done
     cat $logDir/sbtachExclusivceLog.txt >&2
