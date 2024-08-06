@@ -69,6 +69,8 @@ for job_id in `seq 1 $nJobs`; do
     count=$((count+1))
 done
 
+[ $ount -eq $nJobs ] && echo All jobs done >> $1-log/runTime.txt
+
 # Convert total runtime to minutes and print it
 total_runtime_minutes=$((total_runtime / 60 / count))
 echo "Total runtime: $total_runtime_minutes minutes or ($((total_runtime/count)) seconds)"
