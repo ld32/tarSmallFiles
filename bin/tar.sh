@@ -103,6 +103,8 @@ logDir=$dFolder-log
 
 mkdir -p $dFolder $logDir
 
+date >> $dFolder/readme
+echo $USER >> $dFolder/readme
 echo $0 $nJobs $sFolder $dFolder $action >>  $dFolder/readme
 
 notDone=''
