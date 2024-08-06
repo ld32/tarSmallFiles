@@ -103,6 +103,8 @@ logDir=$dFolder-log
 
 mkdir -p $dFolder $logDir
 
+echo $0 $nJobs $sFolder $dFolder $action >>  $dFolder/readme
+
 notDone=''
 if [ -f $logDir/allJobs.txt ]; then 
     IFS=$'\n'; out=`squeue -u $USER -t PD,R -o "%.18i"`
