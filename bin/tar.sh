@@ -163,7 +163,7 @@ elif [[ "$action" == sbatch ]]; then
 
     x=$(wc -l < $logDir/folders.txt) 
     [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs $nJobs > $logDir/runTime.txt
+    echo nJobs $nJobs >> $logDir/runTime.txt
 
     rows_per_job=$(( x / $nJobs ))
     echo "#!/bin/bash" > $logDir/array.sh 
@@ -206,6 +206,8 @@ elif [[ "$action" == sbatch ]]; then
     echo sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
     output=`sbatch --requeue -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
     echo ${output##* } >> $logDir/allJobs.txt
+
+    echo Submitted job ${output##* } >> $logDir/runTime.txt
     echo $output
 
 elif [[ "$action" == esbatch ]]; then 
@@ -213,7 +215,7 @@ elif [[ "$action" == esbatch ]]; then
 
     x=$(wc -l < $logDir/folders.txt)  
     [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs $nJobs > $logDir/runTime.txt
+    echo nJobs $nJobs >> $logDir/runTime.txt
 
     rows_per_job=$(( x / $nJobs ))
     
@@ -247,26 +249,26 @@ elif [[ "$action" == esbatch ]]; then
     echo "  sleep \$((1 + RANDOM % 10))" >> $logDir/job.sh 
     echo "done" >> $logDir/job.sh 
     echo "echo job $jIndex original sbtachExclusivceLog.txt: >&2" >> $logDir/job.sh
-    echo "cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
+    echo "cat /n/shared_db/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
 
-    echo "sed -i \"s/^o\${SLURM_JOB_NODELIST}/\${SLURM_JOB_NODELIST}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
-    echo "sed -i \"s/spaceHolder\${SLURM_JOB_ID}/; done \$(date '+%m-%d %H:%M:%S')/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh  
+    echo "sed -i \"s/^o\${SLURM_JOB_NODELIST}/\${SLURM_JOB_NODELIST}/\" /n/shared_db/sbtachExclusivceLog.txt" >> $logDir/job.sh 
+    echo "sed -i \"s/spaceHolder\${SLURM_JOB_ID}/; done \$(date '+%m-%d %H:%M:%S')/\" /n/shared_db/sbtachExclusivceLog.txt" >> $logDir/job.sh  
 
     #echo "set -x " >> $logDir/job.sh 
     echo "IFS=$'\n'" >> $logDir/job.sh 
-    echo "for line in \`grep '^hold' $logDir/sbtachExclusivceLog.txt | grep -v unhold\`; do " >> $logDir/job.sh 
+    echo "for line in \`grep '^hold' /n/shared_db/sbtachExclusivceLog.txt | grep -v unhold\`; do " >> $logDir/job.sh 
     echo "  job=\${line##* }; p=\`echo \$line | cut -d' ' -f2\`" >> $logDir/job.sh 
-    echo "  node=\`grep '^com' $logDir/sbtachExclusivceLog.txt | grep \$p | head -n1 | tr -s \" \" | cut -f1 | cut -d' ' -f1\`" >> $logDir/job.sh 
+    echo "  node=\`grep '^com' /n/shared_db/sbtachExclusivceLog.txt | grep \$p | head -n1 | tr -s \" \" | cut -f1 | cut -d' ' -f1\`" >> $logDir/job.sh 
     echo "  if [ -z \"\$node\" ]; then " >> $logDir/job.sh 
     echo "      break" >> $logDir/job.sh 
     echo "  else " >> $logDir/job.sh 
     echo "      scontrol update JobID=\$job NodeList=\$node" >> $logDir/job.sh 
     echo "      scontrol release JobID=\$job" >> $logDir/job.sh 
-    echo "      sed -i \"s/^\${node}/o\${node}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
-    echo "      sed -i \"s/\${job}/\${job}; unhold onto: \$node by job: \${SLURM_JOB_ID} \$(date '+%m-%d %H:%M:%S')spaceHolder\${job}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh  
+    echo "      sed -i \"s/^\${node}/o\${node}/\" /n/shared_db/sbtachExclusivceLog.txt" >> $logDir/job.sh 
+    echo "      sed -i \"s/\${job}/\${job}; unhold onto: \$node by job: \${SLURM_JOB_ID} \$(date '+%m-%d %H:%M:%S')spaceHolder\${job}/\" /n/shared_db/sbtachExclusivceLog.txt" >> $logDir/job.sh  
     echo "  fi " >> $logDir/job.sh 
     echo "  echo job $jIndex updated sbtachExclusivceLog.txt: >&2" >> $logDir/job.sh 
-    echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
+    echo "  cat /n/shared_db/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
     echo "done " >> $logDir/job.sh 
     echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
     echo sleep 10 >> $logDir/job.sh # wait for email to send out
@@ -274,13 +276,13 @@ elif [[ "$action" == esbatch ]]; then
     echo Slurm script:
     cat $logDir/job.sh 
     
-    sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | cut -d ' ' -f 1,2 > $logDir/sbtachExclusivceLog.txt
+    [ -f /n/shared_db/sbtachExclusivceLog.txt ] || sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | grep -v allocated | cut -d ' ' -f 1,2 > /n/shared_db/sbtachExclusivceLog.txt
     
     #set -x 
     for i in `seq 1 $nJobs`; do 
         
         #cmd="sh $logDir/job.sh $p 0" 
-        node=`grep '^com' $logDir/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
+        node=`grep '^com' /n/shared_db/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         if [ -z "$node" ]; then
             cmd="sbatch -A rccg --requeue -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
@@ -288,7 +290,7 @@ elif [[ "$action" == esbatch ]]; then
             echo $cmd 
             output="$(eval $cmd)"
             #scontrol hold ${output##* }
-            echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
+            echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> /n/shared_db/sbtachExclusivceLog.txt
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i >> $logDir/runTime.txt
         else
@@ -296,13 +298,13 @@ elif [[ "$action" == esbatch ]]; then
             echo Submitting job:
             echo $cmd 
             output="$(eval $cmd)"
-            sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
-            echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
+            sed -i "s/^${node}/o${node}/" /n/shared_db/sbtachExclusivceLog.txt
+            echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> /n/shared_db/sbtachExclusivceLog.txt
             echo ${output##* } >> $logDir/allJobs.txt
-            echo submitted ${output##* }/$i >> $logDir/runTime.txt
+            echo submitted ${output##* }/$i on $node >> $logDir/runTime.txt
         fi
     done
-    cat $logDir/sbtachExclusivceLog.txt >&2
+    cat /n/shared_db/sbtachExclusivceLog.txt >&2
 
 else 
     echo action wrong: $action; usage;
