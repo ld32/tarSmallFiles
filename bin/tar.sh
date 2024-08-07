@@ -4,9 +4,9 @@
 set -e
 
 function tarFiles() {
-    local files=${1#\\n}                           # remove leading \n
+    local files="${1#\\n}"                           # remove leading \n
 
-    local item=${files%%\\n*}-${files##*\\n}       # firstFile-lastFile
+    local item="${files%%\\n*}-${files##*\\n}"       # firstFile-lastFile
 
     [ -f "$2/$item.tar" ] && echo Tar done earlier: $2/$item.tar && return
     
@@ -48,7 +48,7 @@ function archiveFiles() {
 
 function archiveFolder() {
     
-    cd $1 || { echo folder not accessible, ignoer it: `pwd`/$1 && return; }
+    cd $1 || { echo Error: folder not accessible, ignore it: `pwd`/$1 && return; }
 
     mkdir -p "$2"
     
@@ -195,7 +195,7 @@ elif [[ "$action" == sbatch ]]; then
     echo "echo \$SLURM_ARRAY_TASK_ID end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
 
     echo "echo -e \"Subject: ${dFolder##*/}/\$SLURM_ARRAY_TASK_ID is done\n\`summarizeRun.sh $dFolder\`\" | sendmail `head -n 1 ~/.forward` " >> $logDir/array.sh
-    echo sleep 100  >> $logDir/array.sh
+    echo sleep 10  >> $logDir/array.sh # wait for email to send out
 
     echo Slurm script:
     cat $logDir/array.sh
@@ -204,7 +204,7 @@ elif [[ "$action" == sbatch ]]; then
     #sh $dFolder/array.sh
     #[[ "$SLURM_CLUSTER_NAME" = o2-dev ]] && acc="-A rccg"
     echo sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
-    output=`sbatch -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
+    output=`sbatch --requeue -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
     echo ${output##* } >> $logDir/allJobs.txt
     echo $output
 
@@ -246,12 +246,11 @@ elif [[ "$action" == esbatch ]]; then
     echo "while ! mkdir $logDir/exclusive 2>/dev/null; do" >> $logDir/job.sh 
     echo "  sleep \$((1 + RANDOM % 10))" >> $logDir/job.sh 
     echo "done" >> $logDir/job.sh 
-
+    echo "echo job $jIndex original sbtachExclusivceLog.txt: >&2" >> $logDir/job.sh
     echo "cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
 
     echo "sed -i \"s/^o\${SLURM_JOB_NODELIST}/\${SLURM_JOB_NODELIST}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
-    echo "sed -i \"s/spaceHolder\${SLURM_JOB_ID}/; done \$(date '+%m-%d %H:%M:%S')/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
-    echo "cat $logDir/sbtachExclusivceLog.txt >&2 " >> $logDir/job.sh 
+    echo "sed -i \"s/spaceHolder\${SLURM_JOB_ID}/; done \$(date '+%m-%d %H:%M:%S')/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh  
 
     #echo "set -x " >> $logDir/job.sh 
     echo "IFS=$'\n'" >> $logDir/job.sh 
@@ -266,10 +265,11 @@ elif [[ "$action" == esbatch ]]; then
     echo "      sed -i \"s/^\${node}/o\${node}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh 
     echo "      sed -i \"s/\${job}/\${job}; unhold onto: \$node by job: \${SLURM_JOB_ID} \$(date '+%m-%d %H:%M:%S')spaceHolder\${job}/\" $logDir/sbtachExclusivceLog.txt" >> $logDir/job.sh  
     echo "  fi " >> $logDir/job.sh 
+    echo "  echo job $jIndex updated sbtachExclusivceLog.txt: >&2" >> $logDir/job.sh 
     echo "  cat $logDir/sbtachExclusivceLog.txt >&2" >> $logDir/job.sh 
     echo "done " >> $logDir/job.sh 
     echo "rm -r $logDir/exclusive " >> $logDir/job.sh 
-    echo sleep 100 >> $logDir/job.sh 
+    echo sleep 10 >> $logDir/job.sh # wait for email to send out
     
     echo Slurm script:
     cat $logDir/job.sh 
@@ -283,19 +283,23 @@ elif [[ "$action" == esbatch ]]; then
         node=`grep '^com' $logDir/sbtachExclusivceLog.txt | grep short | head -n1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         if [ -z "$node" ]; then
-            cmd="sbatch -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -A rccg --requeue -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+            echo Submitting job:
             echo $cmd 
-            output="$($cmd)" || output="$(eval $cmd)"
+            output="$(eval $cmd)"
             #scontrol hold ${output##* }
             echo holdit short `date '+%m-%d %H:%M:%S'` job: ${output##* } >> $logDir/sbtachExclusivceLog.txt
             echo ${output##* } >> $logDir/allJobs.txt
+            echo submitted ${output##* }/$i >> $logDir/runTime.txt
         else
-            cmd="sbatch -w $node -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -w $node --requeue -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
+            echo Submitting job:
             echo $cmd 
-            output="$($cmd)" || output="$(eval $cmd)"
+            output="$(eval $cmd)"
             sed -i "s/^${node}/o${node}/" $logDir/sbtachExclusivceLog.txt
             echo submit short `date '+%m-%d %H:%M:%S'` job: ${output##* } on: ${node}spaceHolder${output##* } >> $logDir/sbtachExclusivceLog.txt
             echo ${output##* } >> $logDir/allJobs.txt
+            echo submitted ${output##* }/$i >> $logDir/runTime.txt
         fi
     done
     cat $logDir/sbtachExclusivceLog.txt >&2

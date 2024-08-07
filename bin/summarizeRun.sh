@@ -4,6 +4,13 @@
 
 [ -f $1-log/runTime.txt ] || { echo Runtime file not exist: $1-log/runTime.txt; echo Usage: $0 destinationFolder; exit; }
 
+echo checking log: `realpath $1-log/runTime.txt`, file content:
+cat $1-log/runTime.txt
+
+echo 
+
+echo Run summary:
+
 # Initialize an associative array to store start times
 declare -A start_times
 declare -A job_runtimes
@@ -69,7 +76,7 @@ for job_id in `seq 1 $nJobs`; do
     count=$((count+1))
 done
 
-[ $count -eq $nJobs ] && echo All jobs done >> $1-log/runTime.txt
+[ $count -eq $nJobs ] && echo All jobs done
 
 # Convert total runtime to minutes and print it
 total_runtime_minutes=$((total_runtime / 60 / count))

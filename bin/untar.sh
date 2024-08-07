@@ -5,9 +5,10 @@
 
 function unArchiveFolder() {
     cd $1
-    pwd
+    echo working on: `pwd`
     rm *.list.txt 2>/dev/null
     for item in `find . -maxdepth 1 -mindepth 1 | sort -V`; do 
+
         [ -d "$item" ] && ( unArchiveFolder "$item" ) && continue
         if ([[ "$item" == *tar ]]); then 
             while true; do
@@ -59,7 +60,7 @@ while true; do
 
     time_diff=$((current_time - file_mod_time))
 
-    [ "$time_diff" -gt 10 ] && break 
+    [ "$time_diff" -gt 20 ] && break 
     sleep 3
 
 done 
