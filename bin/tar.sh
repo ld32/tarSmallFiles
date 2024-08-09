@@ -99,7 +99,7 @@ usage() {
 
 [ ! -d "$sFolder" ] && echo Source folder not exist: $sFolder && usage
 
-logDir=$dFolder-log
+logDir=${dFolder}Log
 
 mkdir -p $dFolder $logDir
 

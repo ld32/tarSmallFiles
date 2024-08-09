@@ -39,7 +39,7 @@ dFolder="$3"
 sFolder=`realpath $sFolder`
 dFolder=`realpath $dFolder`
 
-logDir=$dFolder-log
+logDir=${dFolder}Log
 
 mkdir -p $dFolder $logDir
 

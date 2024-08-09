@@ -2,10 +2,10 @@
 
 #set -x 
 
-[ -f $1-log/runTime.txt ] || { echo Runtime file not exist: $1-log/runTime.txt; echo Usage: $0 destinationFolder; exit; }
+[ -f ${1}Log/runTime.txt ] || { echo Runtime file not exist: ${1}Log/runTime.txt; echo Usage: $0 destinationFolder; exit; }
 
-echo checking log: `realpath $1-log/runTime.txt`, file content:
-cat $1-log/runTime.txt
+echo checking log: `realpath ${1}Log/runTime.txt`, file content:
+cat ${1}Log/runTime.txt
 
 echo 
 
