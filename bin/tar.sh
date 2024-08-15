@@ -74,7 +74,6 @@ sFolder=`realpath $1`
     dFolder=${dFolder//\//--}
     mkdir -p $dFolder
 
-
     [ -f $dFolder.log ] && mv $dFolder.log $dFolder.log.$(stat -c '%.19z' $dFolder.log | cut -c 6- | tr " " . | tr ":" "-")
 
     dFolder=`realpath $dFolder`    
