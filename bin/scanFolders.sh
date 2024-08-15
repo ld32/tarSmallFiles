@@ -23,7 +23,6 @@ trap "rm -r $dFolderTmp $tempFile $tempFile.err $tempFile.txt 2>/dev/null" EXIT
 
 echo $sDir > "$tempFile.txt"
 echo "Finding folders up to $level levels deep in $sDir..."
-
 if [ "$level" -gt 1 ]; then  
     for i in `seq 1 $((level -1))`; do 
         echo Adding level $i folder

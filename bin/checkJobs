@@ -41,7 +41,7 @@ if [ -z "$notDone" ]; then
 else 
     echo -e "A run was started earlier on the folder and the folowing jobs are still pending or running\nDo you want to cancel them (yes)?\n$notDone"; 
     read -p "" x </dev/tty
-    if [[ "$x" == y ]]; then 
+    if [[ "$x" == yes ]]; then 
         IFS=' ' 
         for id in $notDone; do 
             echo $id; scancel $id 

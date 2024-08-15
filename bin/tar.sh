@@ -50,7 +50,7 @@ function archiveFiles() {
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return  
 
 usage() {
-    echo "Usage: $0 <nJobs> <sourceFolder> <destinationFolder> <action: singleNode/scan/sbatch/esbatch>"; exit 1;
+    echo "Usage: $0 <sourceFolder> <nLevel> <nJobs>"; exit 1;
 }
 
 date
@@ -64,7 +64,7 @@ nScan=$2
 
 nJobs=$3
 
-action=$4
+action=esbatch
 
 sFolder=`realpath $1`
 
@@ -91,8 +91,6 @@ logDir=${dFolder}Log
 
 mkdir -p $dFolder $logDir
 
-
-
 touch $logDir/archive.log
 
 dFolderTmp=`mktemp -d`
@@ -106,8 +104,6 @@ startTime=`date`
 date >> $logDir/readme
 echo $USER >> $logDir/readme
 echo $0 $sFolder $nScan $nJobs $action | tee -a $logDir/readme
-
-
 
 if [[ "$action" == scan ]]; then 
     
@@ -438,16 +434,7 @@ elif [[ "$action" == esbatch ]]; then
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i on $node >> $logDir/runTime.txt
         fi
-        
-        # cmd="sbatch --qos=testbump --mail-type=FAIL -c 1 --requeue -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
-        # echo Submitting job:
-        # echo $cmd | tee -a $logDir/readme
-        # output="$(eval $cmd)"
-        # echo $output
-        # #sed -i "s/^${node}/o${node}/" $nodeFile
-        # #echo submit short `date '+%Y-%m-%d %H:%M:%S'` job $i: ${output##* } on: ${node}spaceHolder${output##* } >> $nodeFile
-        # echo ${output##* } >> $logDir/allJobs.txt
-        # echo submitted ${output##* }/$i on x >> $logDir/runTime.txt
+    
         sleep 1
     done
     cat $nodeFile >&2

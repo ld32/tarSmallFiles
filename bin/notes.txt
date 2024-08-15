@@ -1,0 +1,4 @@
+1 The original script has only one 'find' command to scan the folders, to speed up the scan, the script now does a 1 to 2 level (adjustable from command line) folder scan, then divides the subfolders into 5 groups, and distribut each group of folders to a new process, and let the processes run in parallel.
+2 The original script's tar step used to go through files one by one, sum up the file size until to 1G to tar them into .tar. Now it does not check file size, but directly tar all the files in the same folder to a single .tar file.   
+3 Add rerun function, so that we can directly re-run the whole workflow, instead of re-run job by job.
+4 Add script to check queue status to make sure the queue is not overloaded, and has enough jobs running.
