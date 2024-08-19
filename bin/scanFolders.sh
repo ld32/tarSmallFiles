@@ -2,37 +2,48 @@
 
 #set -x
 
-[ $# -ne 4 ] && echo "Usage: $0 <nProcess> <sourceDir> <levelOfFistScan> <folderFile>" && exit 1
+[ $# -ne 3 ] && echo "Usage: $0 <sourceDir> <folderFile> <nProcess>" && exit 1
 
-nJobs="$1"
-sDir=`realpath $2`
-dDir=`realpath $3`
-level=$4
+
+sDir=`realpath $1`
+dDir=`realpath $2`
+
+nJobs="$3"
 
 folders="${dDir}Log/folders.txt"
 
 [ -f $folders ] && echo Folder file already exist. Please delete it first: $folders && exit 1
 
-[ $level -lt 1 ] && echo Minimum folder level is 1. && exit 1
+#[ $level -lt 1 ] && echo Minimum folder level is 1. && exit 1
 
 dFolderTmp=`mktemp -d`
 tempFile=$(mktemp)
 touch $tempFile.log
 
-trap "rm -r $dFolderTmp $tempFile $tempFile.err $tempFile.txt 2>/dev/null" EXIT
+trap "rm -r $dFolderTmp $tempFile $tempFile.txt $tempFile.*.txt 2>/dev/null" EXIT
 
-echo $sDir > "$tempFile.txt"
+echo $sDir > "$tempFile.0.txt"
 echo "Finding folders up to $level levels deep in $sDir..."
-if [ "$level" -gt 1 ]; then  
-    for i in `seq 1 $((level -1))`; do 
-        echo Adding level $i folder
-        find "$sDir" -mindepth $i -maxdepth $i -type d >> "$tempFile.txt" || echo "scan level $i error shown above" >> $tempFile.err
-        cat "$tempFile.txt"
-    done 
-fi     
-echo Looking for level $level folders for paralele find command 
-find "$sDir" -mindepth $level -maxdepth $level -type d >> "$tempFile" || echo "scan level $level error shown above" >> $tempFile.err
-#cat "$tempFile" 
+
+echo "Working on first level..."
+
+find "$sDir" -mindepth 1 -maxdepth 1 -type d > "$tempFile" || echo "scan level 1 error shown above" >&2
+
+x=$(wc -l < "$tempFile") 
+
+if [ "$x" -lt 100 ]; then 
+    cat "$tempFile" >> $tempFile.0.txt
+    
+    echo "Working on second level..." 
+    find "$sDir" -mindepth 2 -maxdepth 2 -type d > "$tempFile" || echo "scan level 2 error shown above" >&2
+    x=$(wc -l < "$tempFile") 
+    if [ "$x" -lt 100 ]; then 
+        cat "$tempFile" >> $tempFile.0.txt
+        
+        echo "Working on third level..." 
+        find "$sDir" -mindepth 3 -maxdepth 3 -type d > "$tempFile" || echo "scan level 3 error shown above" >&2
+    fi 
+fi
 
 echo "Finding all subfolders in parallel, limited to $nJobs concurrent processes..."
 cat "$tempFile" | while IFS= read -r folder; do
@@ -48,9 +59,8 @@ cat "$tempFile" | while IFS= read -r folder; do
     done 
     (   #sleep 1
         echo "job $jobID $folder" | tee $tempFile.log
-        find "$folder" -type d >> "$tempFile.txt" || echo "scan job $jobID error shown above" >> $tempFile.err
+        find "$folder" -type d >> "$tempFile.$jobID.txt" || echo "scan job $jobID error shown above" >&2
         rm -r "$dFolderTmp/lock.$jobID" 
-
      ) &
 done
 
@@ -67,18 +77,16 @@ while true; do
 
     time_diff=$((current_time - file_mod_time))
 
-    [ "$time_diff" -ge 200 ] && break 
+    [ "$time_diff" -ge 300 ] && break 
     
-    sleep 1
+    sleep 10
 done 
 
 #sleep 20
+cat  $tempFile.*.txt > $tempFile.txt
+
+sleep 5 
 cp $tempFile.txt $folders
 
 echo "All folders found:": 
 cat $folders
-
-if [ -f $tempFile.err ]; then
-    cat $tempFile.err >&2 
-    exit 1 
-fi

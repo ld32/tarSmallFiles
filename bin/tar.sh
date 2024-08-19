@@ -50,7 +50,7 @@ function archiveFiles() {
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return  
 
 usage() {
-    echo "Usage: $0 <sourceFolder> <nLevel> <nJobs>"; exit 1;
+    echo "Usage: $0 <sourceFolder> <nJobs>"; exit 1;
 }
 
 date
@@ -60,11 +60,9 @@ date
 
 sFolder=$1
 
-nScan=$2 
+nJobs=$2
 
-nJobs=$3
-
-action=$4
+action=$3
 
 sFolder=`realpath $1`
 
@@ -110,7 +108,7 @@ if [[ "$action" == scan ]]; then
     
     #find -L "$sFolder" -type d -exec realpath {} \; | tee $dFolderTmp/folder.txt
     
-    scanFolders.sh 5 "$sFolder" "$dFolder" $nScan 2> $logDir/scanError.txt || true 
+    scanFolders.sh "$sFolder" "$dFolder" 5 2> $logDir/scanError.txt || true 
     
     echo First eight folders: >> $logDir/runTime.txt
     head -n 8 $logDir/folders.txt >> $logDir/runTime.txt
@@ -287,7 +285,7 @@ elif [[ "$action" == esbatch ]]; then
     
     [[ "`realpath .`" == "/n/scratch/users/l/ld32/debug"* ]] && nodeFile=/n/scratch/users/l/ld32/debug/sbatachExclusivceLog.txt
 
-    sinfo -p short -N -o "%N %P %T" | grep -v drain | grep -v down | grep -v allocated | grep -v "\-h\-" | cut -d ' ' -f 1,2 > $nodeFile
+    sinfo -p medium -N -o "%N %P %T" | grep -v drain | grep -v down | grep -v allocated | grep -v "\-h\-" | cut -d ' ' -f 1,2 > $nodeFile
     
     #[[ "$PWD" == "/n/scratch/users/l/ld32/debug"* ]] && nodeFile=/n/scratch/users/l/ld32/debug/sbatachExclusivceLog.txt
 
@@ -363,8 +361,8 @@ elif [[ "$action" == esbatch ]]; then
     echo "  for line in \`grep spaceHolder $nodeFile\`; do " >> $logDir/job.sh 
     echo "      job=\${line##*spaceHolder}; p=\`echo \$line | cut -d' ' -f2\`" >> $logDir/job.sh 
      
-    # submit short 08-07 14:34:37 job: 43540546 on: compute-a-16-35spaceHolder43540546
-    echo "      t=\${line##submit short }; t=\${t% job*}; t=\$(date -d \"\$t\" +%s)" >> $logDir/job.sh 
+    # submit medium 08-07 14:34:37 job: 43540546 on: compute-a-16-35spaceHolder43540546
+    echo "      t=\${line##submit medium }; t=\${t% job*}; t=\$(date -d \"\$t\" +%s)" >> $logDir/job.sh 
     echo "      ct=\$(date +%s); pt=\$((ct - t)); jIndex=\${line#*job }; jIndex=\${jIndex%%:*}" >> $logDir/job.sh 
     
                 # pending for more than x seconds
@@ -374,10 +372,10 @@ elif [[ "$action" == esbatch ]]; then
     echo "              break" >> $logDir/job.sh 
     echo "          else " >> $logDir/job.sh 
     echo "              scancel \$job" >> $logDir/job.sh
-    echo "              cmd=\"sbatch -A rccg --qos=testbump -w \$node --mail-type=FAIL --requeue -o $logDir/slurm.\$jIndex.1.txt -J ${dFolder##*/}.\$jIndex.1 -t 12:0:0 -p short --mem 2G $logDir/job.sh \$jIndex\" " >> $logDir/job.sh 
+    echo "              cmd=\"sbatch -A rccg --qos=testbump -w \$node --mail-type=FAIL --requeue -o $logDir/slurm.\$jIndex.1.txt -J ${dFolder##*/}.\$jIndex.1 -t 48:0:0 -p medium --mem 2G $logDir/job.sh \$jIndex\" " >> $logDir/job.sh 
     echo "              output=\"\$(eval \$cmd)\" " >> $logDir/job.sh 
     echo "              sed -i \"s/^\${node}/o\${node}/\" $nodeFile " >> $logDir/job.sh 
-    echo "              echo submit short \`date '+%Y-%m-%d %H:%M:%S'\` job \$jIndex: \${output##* } on: \${node}spaceHolder\${output##* } >> $nodeFile" >> $logDir/job.sh 
+    echo "              echo submit medium \`date '+%Y-%m-%d %H:%M:%S'\` job \$jIndex: \${output##* } on: \${node}spaceHolder\${output##* } >> $nodeFile" >> $logDir/job.sh 
     echo "              echo \${output##* } >> $logDir/allJobs.txt" >> $logDir/job.sh 
     echo "              echo submitted \${output##* }/\$jIndex on \$node >> $logDir/runTime.txt" >> $logDir/job.sh 
 
@@ -409,27 +407,27 @@ elif [[ "$action" == esbatch ]]; then
         # if done earler, skip it
         grep "^$i end time" $logDir/runTime.txt && echo Done earlier && continue         
         
-        node=`grep '^com' $nodeFile | grep short | shuf -n 1 | tr -s " " | cut -f1 | cut -d' ' -f1`
+        node=`grep '^com' $nodeFile | grep medium | shuf -n 1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         #node=compute-a-16-21
 
         if [ -z "$node" ]; then
-            cmd="sbatch -A rccg --qos=testbump --mail-type=FAIL --requeue -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -A rccg --qos=testbump --mail-type=FAIL --requeue -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -H -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
             echo $output
-            echo holdit short `date '+%m-%d %H:%M:%S'` job $i: ${output##* } >> $nodeFile
+            echo holdit medium `date '+%m-%d %H:%M:%S'` job $i: ${output##* } >> $nodeFile
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i >> $logDir/runTime.txt
         else
-            cmd="sbatch -w $node --qos=testbump --mail-type=FAIL -c 1 --requeue -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -w $node --qos=testbump --mail-type=FAIL -c 1 --requeue -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
             echo $output
             sed -i "s/^${node}/o${node}/" $nodeFile
-            echo submit short `date '+%Y-%m-%d %H:%M:%S'` job $i: ${output##* } on: ${node}spaceHolder${output##* } >> $nodeFile
+            echo submit medium `date '+%Y-%m-%d %H:%M:%S'` job $i: ${output##* } on: ${node}spaceHolder${output##* } >> $nodeFile
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i on $node >> $logDir/runTime.txt
         fi

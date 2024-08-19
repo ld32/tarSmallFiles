@@ -12,8 +12,6 @@ dDir=$1;
 declare -A findFolders # permission folders when runing find
 declare -A cdFolders.  # cd folders when running cd
 
-
-
 echo > $dDir.path 
 cat ${dDir}Log/scanError* | while IFS= read -r line; do
     #echo $line

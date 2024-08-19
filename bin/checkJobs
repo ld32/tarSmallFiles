@@ -45,7 +45,7 @@ else
         IFS=' ' 
         for id in $notDone; do 
             echo $id; scancel $id 
-            sleep 0.2 
+            sleep 0.5
         done 
     fi 
 fi
