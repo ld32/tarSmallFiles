@@ -12,7 +12,7 @@ sDir=`realpath $1`
     dDir=${sDir#*datasets/}
     #dFolder=${dFolder#*1TRaw/}
     dDir=${dDir//\//--}
-    mkdir -p $dDir 
+    mkdir -p $dDir ${dDir}Log
 
 
 nJobs="$2"
