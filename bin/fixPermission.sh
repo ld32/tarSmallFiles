@@ -1,5 +1,5 @@
 
-set -x 
+#set -x 
 # for each source folder
 
 
@@ -12,46 +12,50 @@ dDir=$1;
 declare -A findFolders # permission folders when runing find
 declare -A cdFolders.  # cd folders when running cd
 
+tempFile=$(mktemp)
+
 echo > $dDir.path 
 cat ${dDir}Log/scanError* | while IFS= read -r line; do
     #echo $line
     if [[ "$line" == find* ]]; then 
          echo find it  
          path=${line#*‘}; path=${path%’*}
-         echo $path >> $dDir.path 
-         findFolders[$path] 
+         echo $path >> $tempFile
+         #findFolders[$path] 
     fi 
 done 
 
+mv $tempFile $dDir.path  
+wc -l $dDir.path  
 
-echo > $dDir.path1 
-cat $dDir.path | while IFS= read -r line; do
-    #echo $line
-    if [[ "$line" == find* ]]; then 
-         echo find it  
-         path=${line#*‘}; path=${path%’*}
-         echo $path >> $dDir.path1 
-         cdFolders[$path] 
-    fi 
-done 
-
-
-get_sorted_keys() {
-    local -n array=$1
-    for key in "${!array[@]}"; do
-        echo "$key"
-    done | sort
-}
-
-sorted_start_keys=$(get_sorted_keys start_times)
-sorted_end_keys=$(get_sorted_keys end_times)
+# echo > $dDir.path1 
+# cat $dDir.path | while IFS= read -r line; do
+#     #echo $line
+#     if [[ "$line" == find* ]]; then 
+#          echo find it  
+#          path=${line#*‘}; path=${path%’*}
+#          echo $path >> $dDir.path1 
+#          cdFolders[$path] 
+#     fi 
+# done 
 
 
-cat $dDir.path 
+# get_sorted_keys() {
+#     local -n array=$1
+#     for key in "${!array[@]}"; do
+#         echo "$key"
+#     done | sort
+# }
+
+# sorted_start_keys=$(get_sorted_keys start_times)
+# sorted_end_keys=$(get_sorted_keys end_times)
 
 
-echo "Do you want to chagne pemrisisn for these folders (y)"? 
-read -p "" x </dev/tty 
+# cat $dDir.path 
+
+
+# echo "Do you want to chagne pemrisisn for these folders (y)"? 
+# read -p "" x </dev/tty 
 
 if [[ "$x" == y ]]; then 
     while true; do

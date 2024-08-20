@@ -70,7 +70,7 @@ sFolder=`realpath $1`
     dFolder=${sFolder#*datasets/}
     #dFolder=${dFolder#*1TRaw/}
     dFolder=${dFolder//\//--}
-    mkdir -p $dFolder
+    
     
     [ -f $dFolder.log ] && mv $dFolder.log $dFolder.log.$(stat -c '%.19z' $dFolder.log | cut -c 6- | tr " " . | tr ":" "-")
 
@@ -82,7 +82,6 @@ sFolder=`realpath $1`
 #fi
 
 [ ! -d "$sFolder" ] && echo Source folder not exist: $sFolder && usage
-
 
 logDir=${dFolder}Log
 

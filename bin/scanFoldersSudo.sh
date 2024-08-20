@@ -2,15 +2,22 @@
 
 #set -x
 
-[ $# -ne 3 ] && echo "Usage: $0 <sourceDir> <folderFile> <nProcess>" && exit 1
+[ $# -ne 2 ] && echo "Usage: $0 <sourceDir> <nProcess>" && exit 1
+
 
 
 sDir=`realpath $1`
-dDir=`realpath $2`
 
-nJobs="$3"
+#if [ -z $4 ]; then 
+    dDir=${sDir#*datasets/}
+    #dFolder=${dFolder#*1TRaw/}
+    dDir=${dDir//\//--}
+    mkdir -p $dDir 
 
-folders="${dDir}Log/folders.txt"
+
+nJobs="$2"
+
+folders="${dDir}Log/foldersSudo.txt"
 
 [ -f $folders ] && echo Folder file already exist. Please delete it first: $folders && exit 1
 
@@ -22,11 +29,17 @@ touch $tempFile.log
 
 trap "rm -r $dFolderTmp $tempFile $tempFile.txt $tempFile.*.txt 2>/dev/null" EXIT
 
+while true; do
+    sudo -v
+    sleep 300  # Refresh every 5 minutes
+done &
+
 echo $sDir > "$tempFile.0.txt"
+
 
 echo "Working on first level..."
 
-find "$sDir" -mindepth 1 -maxdepth 1 -type d > "$tempFile" || echo "scan level 1 error shown above" >&2
+sudo find "$sDir" -mindepth 1 -maxdepth 1 -type d > "$tempFile" || echo "scan level 1 error shown above" >&2
 
 x=$(wc -l < "$tempFile") 
 
@@ -34,13 +47,13 @@ if [ "$x" -lt 100 ]; then
     cat "$tempFile" >> $tempFile.0.txt
     
     echo "Working on second level..." 
-    find "$sDir" -mindepth 2 -maxdepth 2 -type d > "$tempFile" || echo "scan level 2 error shown above" >&2
+    sudo find "$sDir" -mindepth 2 -maxdepth 2 -type d > "$tempFile" || echo "scan level 2 error shown above" >&2
     x=$(wc -l < "$tempFile") 
     if [ "$x" -lt 100 ]; then 
         cat "$tempFile" >> $tempFile.0.txt
         
         echo "Working on third level..." 
-        find "$sDir" -mindepth 3 -maxdepth 3 -type d > "$tempFile" || echo "scan level 3 error shown above" >&2
+        sudo find "$sDir" -mindepth 3 -maxdepth 3 -type d > "$tempFile" || echo "scan level 3 error shown above" >&2
     fi 
 fi
 
@@ -58,7 +71,7 @@ cat "$tempFile" | while IFS= read -r folder; do
     done 
     (   #sleep 1
         echo "job $jobID $folder" | tee $tempFile.log
-        find "$folder" -type d >> "$tempFile.$jobID.txt" || echo "scan job $jobID error shown above" >&2
+        sudo find "$folder" -type d >> "$tempFile.$jobID.txt" || echo "scan job $jobID error shown above" >&2
         rm -r "$dFolderTmp/lock.$jobID" 
      ) &
 done

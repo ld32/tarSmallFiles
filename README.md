@@ -6,7 +6,7 @@ git clone https://github.com/ld32/tarSmallFiles.git
 export PATH=$PWD/tarSmallFiles/bin:$PATH
 
 ## To run tar.sh:
-sbatch -p short -t 4:0:0 -o slurm.esbatch.log -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> <nJobs> <esbatch>" 
+sbatch -p short -t 4:0:0 -o slurm.esbatch.log -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> \<nJobs\> \<esbatch\>" 
 
 For example:
 
@@ -22,7 +22,7 @@ checkJobs \<destinationFolder\>
 summarizeRun \<destinationFolder\>
 
 ## To re-run failed jobs:
-sbatch -p short -t 4:0:0 -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> <nJobs> <esbatch>" -o destinationDir.log
+sbatch -p short -t 4:0:0 -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> \<nJobs\> \<esbatch\>" -o destinationDir.log
 
 ## Procedure to process the folders:
 
@@ -36,7 +36,7 @@ checkJobs \<destinationFolder\>
 summarizeRun \<destinationFolder\>
 
 ### 4 If there is no jobs running on the folder, and the folder is not finish yet, submit or re-submit with (Command is copied from worksheet): 
-sbatch -p short -t 4:0:0 -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> <nJobs> <esbatch>" -o destinationDir.log
+sbatch -p short -t 4:0:0 -J eSbatch --mem 4G --mail-type=all -c 1 --wrap="tar.sh \<sourceFolder\> \<nJobs\> \<esbatch\>" -o destinationDir.log
 
 ## Note: Folder level for the single process to scan is automatically chosen now
 

@@ -4,7 +4,6 @@
 
 dFolder="$1"
 
-
 # if [ "$dFolder" == /* ]; then 
 
 #     [ ! -d "$dFolder" ] && echo Source folder not exist: $dFolder && usage
@@ -70,8 +69,15 @@ while IFS= read -r line; do
 
         event_type=${fields[1]}
         
+
+        
+
+        
         # Extract the time fields
         time_string="${fields[@]:3:6}"
+       
+
+       
         
         # Convert the time to seconds since the epoch
         event_time=$(date -d "$time_string" +%s)
@@ -96,17 +102,19 @@ while IFS= read -r line; do
     else 
         continue
     fi
+
+    
 done < $runtimeFile
 
-
+#exit 
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 GREEN='\033[0;32m'
 
 summ=""
-while true; do 
-    count=0
+
+    count=0; count1=0; 
     # Print the runtime for each job in minutes
     for jIndex in `seq 1 $nJobs`; do
 
@@ -118,18 +126,28 @@ while true; do
         start_time=${start_times[$jIndex]}
         end_time=${end_times[$jIndex]}
        # if [ -n "$start_time" ]; then
-            if [ -n "$end_time" ]; then 
-                runtime=$((event_time - start_time))
-                #job_runtimes[$jIndex]=$runtime
-                total_runtime=$((total_runtime + runtime))
-                count=$((count+1))
-            else 
-                echo end missing for $jIndex
-                noData=y
+            if [ -n "$start_time" ]; then 
+                if [ -n "$end_time" ]; then 
+                    runtime=$((end_time - start_time))
+                    job_runtimes[$jIndex]=$runtime
+                    total_runtime=$((total_runtime + runtime))
+                    count=$((count+1))
+                else
 
-                summ="$summ\nend missing for $jIndex"
-                
+                    echo end missing for $jIndex
+                    noData=y
+                    summ="$summ\n end missing for $jIndex"
+                fi 
+            else 
+                echo start missing for $jIndex
+                noData=y
+                summ="$summ\n start missing for $jIndex"
             fi
+
+            if [ -n "$end_time" ]; then 
+                count1=$((count1+1))
+            fi 
+
         #else 
         #    echo start missing start for $jIndex
         #    noData=y
@@ -157,7 +175,7 @@ while true; do
             # echo ${x/slurm.$jIndex/slurm.$jIndex.1};
             #continue 
         
-        
+            runtime=${job_runtimes[$jIndex]}
             runtime_minutes=$((runtime / 60))
             echo -e "runtime: $runtime_minutes minutes or ($runtime seconds)"
             #echo -e "${RED}no data for job $jIndex Here is the data for ${jIndex}: ${NC}"
@@ -170,13 +188,12 @@ while true; do
         #count=$((count+1))
     done
 
-    [ $count -eq $nJobs ] && echo All jobs done || { echo $count/$nJobs done; echo -e "$summ"; } 
+    [ $count1 -eq $nJobs ] && echo All jobs done || { echo $count1/$nJobs done; echo -e "$summ"; } 
 
     # Convert total runtime to minutes and print it
     total_runtime_minutes=$((total_runtime / 60 / count))
     echo "Total runtime: $total_runtime_minutes minutes or ($((total_runtime/count)) seconds)"
 
-    break 
     # echo -e "Please select the job index you want to check or type ${RED}q${NC} to quit:"
             
     #read -p "" jIndex </dev/tty
@@ -209,7 +226,7 @@ while true; do
     #     fi
     # done
 
-done 
+
 
 exit 
 
