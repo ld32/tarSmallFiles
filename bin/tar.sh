@@ -8,7 +8,7 @@ function archiveFiles() {
     
     local path="$1"; path="$dFolder${path#$sFolder}"; 
     
-    ls "$path"/*.tar 1> /dev/null 2>&1 && echo Tar done earlier: $path/some.tar && return
+    ls "$path"/*.tar && echo Tar done earlier && return
 
     cd $1 || { echo Error: cd folder failed $1 | tee -a  $logDir/tarError$2.txt; return; } 
 
@@ -70,8 +70,7 @@ sFolder=`realpath $1`
     dFolder=${sFolder#*datasets/}
     #dFolder=${dFolder#*1TRaw/}
     dFolder=${dFolder//\//--}
-    
-    
+
     [ -f $dFolder.log ] && mv $dFolder.log $dFolder.log.$(stat -c '%.19z' $dFolder.log | cut -c 6- | tr " " . | tr ":" "-")
 
     dFolder=`realpath $dFolder`    
@@ -107,7 +106,7 @@ if [[ "$action" == scan ]]; then
     
     #find -L "$sFolder" -type d -exec realpath {} \; | tee $dFolderTmp/folder.txt
     
-    scanFolders.sh "$sFolder" "$dFolder" 5 2> $logDir/scanError.txt || true 
+    scanFolders.sh "$sFolder" 5 2> $logDir/scanError.txt || true 
     
     echo First eight folders: >> $logDir/runTime.txt
     head -n 8 $logDir/folders.txt >> $logDir/runTime.txt
@@ -225,7 +224,7 @@ elif [[ "$action" == sbatch ]]; then
     #cat $logDir/array.sh
     
     echo sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
-    output=`sbatch --mail-type=FAIL --requeue -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
+    output=`sbatch -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
     echo ${output##* } >> $logDir/allJobs.txt
 
     echo Submitted job ${output##* } >> $logDir/runTime.txt
@@ -371,7 +370,7 @@ elif [[ "$action" == esbatch ]]; then
     echo "              break" >> $logDir/job.sh 
     echo "          else " >> $logDir/job.sh 
     echo "              scancel \$job" >> $logDir/job.sh
-    echo "              cmd=\"sbatch -A rccg --qos=testbump -w \$node --mail-type=FAIL --requeue -o $logDir/slurm.\$jIndex.1.txt -J ${dFolder##*/}.\$jIndex.1 -t 48:0:0 -p medium --mem 2G $logDir/job.sh \$jIndex\" " >> $logDir/job.sh 
+    echo "              cmd=\"sbatch -A rccg --qos=testbump -w \$node -o $logDir/slurm.\$jIndex.1.txt -J ${dFolder##*/}.\$jIndex.1 -t 48:0:0 -p medium --mem 2G $logDir/job.sh \$jIndex\" " >> $logDir/job.sh 
     echo "              output=\"\$(eval \$cmd)\" " >> $logDir/job.sh 
     echo "              sed -i \"s/^\${node}/o\${node}/\" $nodeFile " >> $logDir/job.sh 
     echo "              echo submit medium \`date '+%Y-%m-%d %H:%M:%S'\` job \$jIndex: \${output##* } on: \${node}spaceHolder\${output##* } >> $nodeFile" >> $logDir/job.sh 
@@ -411,7 +410,7 @@ elif [[ "$action" == esbatch ]]; then
         #node=compute-a-16-21
 
         if [ -z "$node" ]; then
-            cmd="sbatch -A rccg --qos=testbump --mail-type=FAIL --requeue -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -H -p medium --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -A rccg --qos=testbump -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -H -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
@@ -420,7 +419,7 @@ elif [[ "$action" == esbatch ]]; then
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i >> $logDir/runTime.txt
         else
-            cmd="sbatch -w $node --qos=testbump --mail-type=FAIL -c 1 --requeue -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -p medium --mem 2G $logDir/job.sh $i" 
+            cmd="sbatch -w $node --qos=testbump -c 1 -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"

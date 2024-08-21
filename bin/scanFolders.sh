@@ -2,13 +2,16 @@
 
 #set -x
 
-[ $# -ne 3 ] && echo "Usage: $0 <sourceDir> <folderFile> <nProcess>" && exit 1
-
+[ $# -ne 2 ] && echo "Usage: $0 <sourceDir> <nProcess>" && exit 1
 
 sDir=`realpath $1`
-dDir=`realpath $2`
 
-nJobs="$3"
+#if [ -z $4 ]; then 
+    dDir=${sDir#*datasets/}
+    #dFolder=${dFolder#*1TRaw/}
+    dDir=${dDir//\//--}
+    mkdir -p $dDir ${dDir}Log
+nJobs="$2"
 
 folders="${dDir}Log/folders.txt"
 
@@ -23,6 +26,7 @@ touch $tempFile.log
 trap "rm -r $dFolderTmp $tempFile $tempFile.txt $tempFile.*.txt 2>/dev/null" EXIT
 
 echo $sDir > "$tempFile.0.txt"
+
 
 echo "Working on first level..."
 
