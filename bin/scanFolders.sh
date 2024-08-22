@@ -23,14 +23,14 @@ dFolderTmp=`mktemp -d`
 tempFile=$(mktemp)
 touch $tempFile.log
 
-trap "rm -r $dFolderTmp $tempFile $tempFile.txt $tempFile.*.txt 2>/dev/null" EXIT
+trap "rm -r $dFolderTmp $tempFile $tempFile.txt  $tempFile.*.err $tempFile.*.txt 2>/dev/null" EXIT
 
 echo $sDir > "$tempFile.0.txt"
 
 
 echo "Working on first level..."
 
-find "$sDir" -mindepth 1 -maxdepth 1 -type d > "$tempFile" || echo "scan level 1 error shown above" >&2
+find "$sDir" -mindepth 1 -maxdepth 1 -type d > "$tempFile" 2>> $tempFile.0.err || echo "scan level 1 error shown above" >>$tempFile.0.err
 
 x=$(wc -l < "$tempFile") 
 
@@ -38,13 +38,13 @@ if [ "$x" -lt 100 ]; then
     cat "$tempFile" >> $tempFile.0.txt
     
     echo "Working on second level..." 
-    find "$sDir" -mindepth 2 -maxdepth 2 -type d > "$tempFile" || echo "scan level 2 error shown above" >&2
+    find "$sDir" -mindepth 2 -maxdepth 2 -type d > "$tempFile" 2>> $tempFile.0.err || echo "scan level 2 error shown above" >> $tempFile.0.err
     x=$(wc -l < "$tempFile") 
     if [ "$x" -lt 100 ]; then 
         cat "$tempFile" >> $tempFile.0.txt
         
         echo "Working on third level..." 
-        find "$sDir" -mindepth 3 -maxdepth 3 -type d > "$tempFile" || echo "scan level 3 error shown above" >&2
+        find "$sDir" -mindepth 3 -maxdepth 3 -type d > "$tempFile" 2>> $tempFile.0.err || echo "scan level 3 error shown above" >> $tempFile.0.err
     fi 
 fi
 
@@ -62,7 +62,7 @@ cat "$tempFile" | while IFS= read -r folder; do
     done 
     (   #sleep 1
         echo "job $jobID $folder" | tee $tempFile.log
-        find "$folder" -type d >> "$tempFile.$jobID.txt" || echo "scan job $jobID error shown above" >&2
+        find "$folder" -type d >> "$tempFile.$jobID.txt" 2>> $tempFile.$jobID.err || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err
         rm -r "$dFolderTmp/lock.$jobID" 
      ) &
 done
@@ -90,6 +90,8 @@ cat  $tempFile.*.txt > $tempFile.txt
 
 sleep 5 
 cp $tempFile.txt $folders
+
+cat $tempFile.*.err >&2
 
 echo "All folders found:": 
 cat $folders
