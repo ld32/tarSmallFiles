@@ -2,12 +2,7 @@
 
 #set -x
 
-
 dFolder="$1"
-
-echo 
-echo -------------------------------------------------- 
-echo ${dFolder}Log
 
 # if [ "$dFolder" == /* ]; then 
 
@@ -30,7 +25,8 @@ echo ${dFolder}Log
 
 [ -f $runtimeFile ] || { echo Runtime file not exist: $runtimeFile; echo Usage: $0 destinationFolder; exit; }
 
-
+echo 
+echo -------------------------------------------------- 
 
 echo checking log: $runtimeFile, file content:
 
@@ -134,25 +130,24 @@ summ=""
             fi 
         else 
             echo start missing for $jIndex
-            #summ="$summ\n start missing for $jIndex"
+            summ="$summ\n start missing for $jIndex"
         fi
 
         if [ -n "$end_time" ]; then 
             count1=$((count1+1))
         else 
-            echo end missing for $jIndex
-            #summ="$summ\n end missing for $jIndex"
+            summ="$summ\n end missing for $jIndex"
         fi 
 
-        [ -f ${dFolder}Log/tarError$jIndex.txt ] && echo -e "$RED Has tar error $NC ${dFolder}Log/tarError$jIndex.txt"
+        [ -f ${dFolder}Log/tarError$jIndex.txt ] && echo -e "$RED Has tar error $NC"
         #echo 
     done
-   
+
+    [ $count1 -eq $nJobs ] && echo All $count1 of $nJobs jobs done || { echo $count1/$nJobs done; echo -e "$summ"; } 
+
     # Convert total runtime to minutes and print it
     total_runtime_minutes=$((total_runtime / 60 / count))
     echo "Average runtime: $total_runtime_minutes minutes or ($((total_runtime/count)) seconds)"
-
-    [ $count1 -eq $nJobs ] && echo All $count1 of $nJobs jobs done ++++++++++++++++++++ || { echo $count1/$nJobs done; } 
 
     # echo -e "Please select the job index you want to check or type ${RED}q${NC} to quit:"
             

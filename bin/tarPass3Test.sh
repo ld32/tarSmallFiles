@@ -1,50 +1,75 @@
 #!/bin/bash
 
-#set -x
+set -x
 
-#set -e
+set -e
 
 function archiveFiles() {
     
     local path="$1"; path="$dFolder${path#$sFolder}"; 
-    
-    ls "$path"/*.tar && echo Tar done earlier && return
 
+    rm "$path"/*.tar "$path"/*.md5sum 2>/dev/null || true 
+
+    #ls "$path"/*.tar && echo Tar done earlier && return
+
+    mkdir -p "$path" || { echo Error: make folder $path | tee -a  $logDir/tarError$2.txt; }
+
+    
     cd $1 || { echo Error: cd folder failed $1 | tee -a  $logDir/tarError$2.txt; return; } 
 
+    local tmp=`mktemp` # && printf "%s\n" "${files[@]}" > $tmp.list
+
     # only file name without folder name
-    local files=(`find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f\n" | sort -n`) || { echo Error: find file error for folder $1 | tee -a  $logDir/tarError$2.txt; } 
+    local files=(`find -L . -maxdepth 1 -mindepth 1 -type f -printf "%f\n" | sort -n | tee $tmp.list`) || { echo Error: find file error for folder $1 | tee -a  $logDir/tarError$2.txt; return; } 
 
     # get full path 
     #local files=`find -L $1 -maxdepth 1 -mindepth 1 -type f | sort -n` ||  touch $dFolderTmp/lock.err
     
+    #cat $tmp.list
+
     #[ -z "$files" ] && return 
     [ ${#files[@]} -eq 0 ] && return
 
     #files=($files) 
     #local item=$(basename ${files[0]})-$(basename ${files[-1]})
 
-    local item=${files[0]}-${files[-1]}
+    local item=`echo ${files[0]}-${files[-1]} | sed 's/[^a-zA-Z0-9]/_/g'`
 
     #[ -f "$path/$item.tar" ] && echo Tar done earlier: $path/$item.tar && return
 
-    mkdir -p "$path" || { echo Error: make folder $path | tee -a  $logDir/tarError$2.txt; } 
-
-    local tmp=`mktemp` && printf "%s\n" "${files[@]}" > $tmp.list
-    
     # somehow -C and -T are not compatible, so we have to remove -C, and use full path for file list
     #tar --create --preserve-permissions --file "$tmp" -T $tmp.list -C $1 ||  touch $dFolderTmp/lock.err
 
-    tar --create --preserve-permissions --file "$tmp" -T $tmp.list || { echo Error: tar $path | tee -a $logDir/tarError$2.txt; } 
+    tar --create --preserve-permissions --file "$tmp" -T $tmp.list || { echo Error: tar $path | tee -a $logDir/tarError$2.txt; return; } 
     
-    checkSum=$(md5sum "$tmp" | awk '{ print $1 }') || { echo Error: checksum $path | tee -a  $logDir/tarError$2.txt; } 
+    checkSum=$(md5sum "$tmp" | awk '{ print $1 }') || { echo Error: checksum $path | tee -a  $logDir/tarError$2.txt; return; } 
     
-    echo "$checkSum $item.tar" > "$path/$item.md5sum" || { echo Error: echo $path/$item.md5sum | tee -a $logDir/tarError$2.txt; } 
+    echo "$checkSum $item.tar" > "$path/$item.md5sum" || { echo Error: echo $path/$item.md5sum | tee -a $logDir/tarError$2.txt; return; } 
  
-    cp "$tmp" "$path/$item.tar" || { echo Error: cp .tar $path | tee -a  $logDir/tarError$2.txt; } 
+    cp "$tmp" "$path/$item.tar" || { echo Error: cp .tar $path | tee -a  $logDir/tarError$2.txt; return; } 
     
     rm -r $tmp $tmp.list
 }
+
+export sFolder=/n/scratch/users/l/ld32/datasets/intersection/catmaided/1TRaw/small
+export dFolder=/n/scratch/users/l/ld32/debug/intersection--catmaided--1TRaw--small
+export logDir=/n/scratch/users/l/ld32/debug/intersection--catmaided--1TRaw--smallLog
+jIndex=$1
+echo job index: $jIndex
+echo $jIndex start time $(date) $SLURM_JOBID >> /n/scratch/users/l/ld32/debug/intersection--catmaided--1TRaw--smallLog/runTime.txt
+start_row=$(( (jIndex - 1) * 10 + 1 ))
+end_row=$(( jIndex * 10 ))
+[ $jIndex -eq 1 ] && end_row=10
+sed -n "${start_row},${end_row}p" /n/scratch/users/l/ld32/debug/intersection--catmaided--1TRaw--smallLog/folders.txt
+#source /home/ld32/data/tarSmallFiles1/bin/checkTarT.sh
+sed -n "${start_row},${end_row}p" /n/scratch/users/l/ld32/debug/intersection--catmaided--1TRaw--smallLog/folders.txt  | while IFS= read -r line; do
+  archiveFiles "$line" $jIndex
+  #exit
+done
+echo done
+
+
+exit 
 
 # script is sourced, so only source the bash functions
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return  
@@ -68,6 +93,9 @@ sFolder=`realpath $1`
 
 #if [ -z $4 ]; then 
     dFolder=${sFolder#*datasets/}
+
+    [[ "$dFolder" == *datasets ]] && dFolder=smallFolders 
+
     #dFolder=${dFolder#*1TRaw/}
     dFolder=${dFolder//\//--}
 
@@ -90,8 +118,6 @@ touch $logDir/archive.log
 
 dFolderTmp=`mktemp -d`
 
-touch $dFolderTmp/lock.log
-
 trap "rm -r $dFolderTmp" EXIT
 
 startTime=`date`
@@ -99,6 +125,8 @@ startTime=`date`
 date >> $logDir/readme
 echo $USER >> $logDir/readme
 echo $0 $sFolder $nScan $nJobs $action | tee -a $logDir/readme
+echo $SLURM_JOB_ID
+
 
 if [[ "$action" == scan ]]; then 
     
@@ -106,8 +134,11 @@ if [[ "$action" == scan ]]; then
     
     #find -L "$sFolder" -type d -exec realpath {} \; | tee $dFolderTmp/folder.txt
     
-    scanFolders.sh "$sFolder" 5 2> $logDir/scanError.txt || true 
-    
+    if [[ "$dFolder" == *smallFolders ]]; then
+        scanSmallFolders.sh "$sFolder" 2> $logDir/scanError.txt || true 
+    else  
+        scanFolders.sh "$sFolder" 5 2> $logDir/scanError.txt || true 
+    fi  
     echo First eight folders: >> $logDir/runTime.txt
     head -n 8 $logDir/folders.txt >> $logDir/runTime.txt
     
@@ -150,22 +181,15 @@ elif [[ "$action" == singleNode ]]; then
             [ "$jobID" -eq 0 ] && sleep 1 || break 
         done 
         
-        (   echo -e "\njob $jobID\n$(date)\n$item" | tee -a $dFolderTmp/lock.log
+        (   echo -e "\njob $jobID\n$(date)\n$item"
             archiveFiles "$item" $jobID; 
             rm -r $dFolderTmp/lock.$jobID; 
-            #echo -e "\njob $jobID\n$(date)\n$item done" | tee -a $dFolderTmp/lock.log
+            #echo -e "\njob $jobID\n$(date)\n$item done"
         ) &
     done 
      
     while true; do 
-        sleep 4
-        current_time=$(date +%s)
-        
-        file_mod_time=$(stat -c %Y "$dFolderTmp/lock.log")
-
-        time_diff=$((current_time - file_mod_time))
-
-        [ "$time_diff" -ge 20 ] && break
+         ls $dFolderTmp/lock.* && sleep 30  || break 
     done 
 
     echo 1 end time $(date) >> $logDir/runTime.txt
