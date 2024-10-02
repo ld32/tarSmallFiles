@@ -1,6 +1,6 @@
 # check how many jobs are running and pending
 
-t=`squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -u $USER`
+t=`squeue -o "%.18i %.9P %.40j %.8u %.2t %.10M %.6D %R" -u $USER`
 echo -e "$t" | grep " R " 
 
 echo running: `echo -e "$t" | grep " R " | wc -l` 

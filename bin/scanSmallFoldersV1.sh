@@ -13,13 +13,13 @@ folders=smallFoldersLog/folders.txt #"${dDir}Log/folders.txt"
 
 [ -f $folders ] && echo Folder file already exist. Please delete it first: $folders && exit 1
 
-nJobs=5 
+nJobs=1 
 
 #[ $level -lt 1 ] && echo Minimum folder level is 1. && exit 1
 
 dFolderTmp=$(mktemp -d /n/scratch/users/l/ld32/tmp.XXXXXX)
 
-tempFile=$(mktemp /n/scratch/users/l/ld32/tmpfile.XXXXXX)
+tempFile=$(mktemp)
 
 trap "rm -r $dFolderTmp $tempFile $tempFile.txt  $tempFile.*.err $tempFile.*.txt 2>/dev/null" EXIT
 
@@ -58,32 +58,33 @@ done
 
 echo Scan folders in parallel
 cat "$tempFile" | while IFS= read -r folder; do
-    #while true; do
+    while true; do
         jobID=0
-     #   for i in $(seq 1 $nJobs); do
-      #      if `mkdir $dFolderTmp/lock.$i 2>/dev/null`; then
-       #         jobID=$i
-       #         break
-        #    fi
-        #done
-        #[ "$jobID" -eq "0" ] && sleep 1 || break 
-    #done 
-    #(   #sleep 1
-    #    echo "job $jobID $folder" 
+        for i in $(seq 1 $nJobs); do
+            if `mkdir $dFolderTmp/lock.$i 2>/dev/null`; then
+                jobID=$i
+                break
+            fi
+        done
+        [ "$jobID" -eq "0" ] && sleep 1 || break 
+    done 
+    (   #sleep 1
+        echo "job $jobID $folder" 
         find "$folder" -type d >> "$tempFile.$jobID.txt" 2>> $tempFile.$jobID.err || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err
-     #   rm -r "$dFolderTmp/lock.$jobID" 
-     #) &
+        rm -r "$dFolderTmp/lock.$jobID" 
+        echo removed "$dFolderTmp/lock.$jobID" for "$folder"
+     ) &
 done
 
 # doest not work somehow
 #wait
 
-# while true; do 
+while true; do 
 
-#     [[ $sDir == *scratch* ]] && sleep 5 && break 
+    [[ $sDir == *scratch* ]] && sleep 5 && break 
 
-#     ls "$dFolderTmp/lock.*" 2>/dev/null && sleep 30 || break 
-# done 
+    ls "$dFolderTmp/lock.*" 2>/dev/null && sleep 30 || break 
+done 
 
 #sleep 20
 cat  $tempFile.*.txt > $tempFile.txt

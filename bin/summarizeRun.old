@@ -1,0 +1,262 @@
+#!/bin/bash
+
+#set -x
+
+
+dFolder="$1"
+
+echo 
+echo -------------------------------------------------- 
+echo ${dFolder}Log
+
+# if [ "$dFolder" == /* ]; then 
+
+#     [ ! -d "$dFolder" ] && echo Source folder not exist: $dFolder && usage
+
+#     dFolder=`realpath $1`
+
+
+#     dFolder=${dFolder#*datasets/}
+#     #dFolder=${dFolder#*1TRaw/}
+#     dFolder=${dFolder//\//--}
+    
+#     runtimeFile=${dFolder}Log/runTime.txt
+# else 
+    cat ${dFolder}Log03/runTime.txt ${dFolder}Log031/runTime.txt > ${dFolder}Log/runTime.txt.combined
+    runtimeFile=${dFolder}Log/runTime.txt.combined
+# fi 
+    #runtimeFile=${dFolder}Log/runTime.txt
+# [ -z $2 ] || runtimeFile=$2 
+
+[ -f $runtimeFile ] || { echo Runtime file not exist: $runtimeFile; echo Usage: $0 destinationFolder; exit; }
+
+
+
+echo checking log: $runtimeFile, file content:
+
+#cat $runtimeFile
+
+echo 
+
+grep "^Scan"  $runtimeFile
+
+echo Scan error: 
+for i in `ls ${dFolder}Log/scan*`; do 
+    echo $i
+    echo last 25 rows:
+    tail -n 25 $i 
+    echo 
+done 
+
+echo Run summary:
+
+# Initialize an associative array to store start times
+declare -A start_times
+declare -A emd_times
+declare -A job_runtimes
+
+# Initialize a variable to store the total runtime
+total_runtime=0
+
+# Read the log file line by line
+while IFS= read -r line; do
+    # Split the line into an array
+    IFS=' ' read -r -a fields <<< "$line"
+    
+    # Extract the job id and the event type (start or end)
+    jIndex=${fields[0]}
+    
+    #[[ "$jIndex" == Scan ]] && echo $line && continue 
+    
+    [[ "$jIndex" == nJobs ]] && nJobs=${fields[1]} && continue
+    
+    if [[ "$jIndex" =~ ^-?[0-9]+$ ]]; then 
+
+        event_type=${fields[1]}
+        
+        # Extract the time fields
+        time_string="${fields[@]:3:6}"
+    
+        # Convert the time to seconds since the epoch
+        event_time=$(date -d "$time_string" +%s)
+        
+        if [ "$event_type" == "start" ]; then
+            # Store the start time in the associative array
+            start_times[$jIndex]=$event_time
+        elif [ "$event_type" == "end" ]; then
+            end_times[$jIndex]=$event_time
+        fi
+
+        #     # Calculate the runtime and add it to the total_runtime
+        #     start_time=${start_times[$jIndex]}
+        #     if [ -n "$start_time" ]; then
+        #         runtime=$((event_time - start_time))
+        #         job_runtimes[$jIndex]=$runtime
+        #         total_runtime=$((total_runtime + runtime))
+        #     else 
+        #         echo start missing start for $jIndex
+        #     fi
+        # fi
+    else 
+        continue
+    fi
+
+    
+done < $runtimeFile
+
+#exit 
+
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+GREEN='\033[0;32m'
+
+summ=""
+
+    count=0; count1=0; 
+    # Print the runtime for each job in minutes
+    for jIndex in `seq 1 $nJobs`; do
+
+        #echo -e "Job $RED$jIndex$NC"
+
+        # Calculate the runtime and add it to the total_runtime
+        start_time=${start_times[$jIndex]}
+        end_time=${end_times[$jIndex]}
+     
+        if [ -n "$start_time" ]; then 
+            if [ -n "$end_time" ]; then 
+                runtime=$((end_time - start_time))
+                job_runtimes[$jIndex]=$runtime
+                total_runtime=$((total_runtime + runtime))
+                count=$((count+1))
+
+                runtime_minutes=$((runtime / 60))
+                #echo -e "runtime: $runtime_minutes minutes or ($runtime seconds)"
+            fi 
+        else 
+            echo start missing for $jIndex
+            #summ="$summ\n start missing for $jIndex"
+        fi
+
+        if [ -n "$end_time" ]; then 
+            count1=$((count1+1))
+        else 
+            echo end missing for $jIndex
+            #summ="$summ\n end missing for $jIndex"
+        fi 
+
+        [ -f ${dFolder}Log/tarError$jIndex.txt ] && echo -e "$RED Has tar error $NC ${dFolder}Log/tarError$jIndex.txt"
+        #echo 
+    done
+   
+    # Convert total runtime to minutes and print it
+    total_runtime_minutes=$((total_runtime / 60 / count))
+    echo "Average runtime: $total_runtime_minutes minutes or ($((total_runtime/count)) seconds)"
+
+    [ $count1 -eq $nJobs ] && echo All $count1 of $nJobs jobs done ++++++++++++++++++++ || { echo $count1/$nJobs done; } 
+
+    # echo -e "Please select the job index you want to check or type ${RED}q${NC} to quit:"
+            
+    #read -p "" jIndex </dev/tty
+    #[[ "$jIndex" == q ]] && break
+        
+    # [[ "$jIndex" =~ ^[0-9]+$ && "$jIndex" -lt $nJobs && "$jIndex" -ne 0 ]] || { echo -e "${RED}Out of range. Should be between > 0 and < $nJobs"; continue; }
+
+    # while true; do 
+       
+    #     if [ -f ${dFolder}Log/tarError$jIndex.txt ]; then 
+
+    #         echo -e "${RED}1${NC}: ${dFolder}Log/tarError$jIndex.txt"
+    #     fi 
+    #     if [ -f ${dFolder}Log/slurm.$jIndex.txt ]; then 
+    #         echo -e "${RED}2${NC}: ${dFolder}Log/slurm.$jIndex.txt"
+    #     fi 
+
+    #     echo -e "Please select the file you want to check or type ${RED}q${NC} to quit:"
+
+    #     read -p "" jIndex </dev/tty
+            
+    #     [[ "$jIndex" == q ]] && break
+        
+    #     if [ "$jIndex" -eq 1 ]; then 
+    #         less ${dFolder}Log/tarError$jIndex.txt;
+    #     elif [ "$jIndex" -eq 2 ]; then 
+    #         less ${dFolder}Log/slurm.$jIndex.txt;    
+    #     elif [[ "$jIndex" == q ]]; then 
+    #         break
+    #     fi
+    # done
+exit 
+
+
+#     cat ${dFolder}Log/slurm.$jIndex.txt;
+
+#     i=${dFolder}Log/tarError$jIndex.txt;
+    
+#     if [ -f $i ]; then
+        
+#         echo last 25 rows of $i:
+#         tail -n 25 $i 
+
+#         jIndex=${i#*tarError}; jIndex=${jIndex%.txt}
+#         if [ -f  ${dFolder}Log/slurm.$jIndex.txt ]; then 
+#                 echo
+#                 echo please check ${dFolder}Log/slurm.$jIndex.txt: 
+#                 echo last 25 rows:
+#                 tail -n 25 ${dFolder}Log/slurm.$jIndex.txt 
+#         else 
+#             echo
+#             echo job log file not exist. Please check the job
+#         fi
+#         jID=`grep "/$jIndex on" $runtimeFile`;
+#         jID=${jID#submitted }; jID=${jID%/*}; 
+#         echo 
+#         echo sacct output:
+#         sacct --format=JobID,Submit,Start,End,MaxRSS,State,NodeList%30,Partition,ReqTRES%30,TotalCPU,Elapsed%14,Timelimit%14,ExitCode --units=G -j $jID
+        
+#         echo 
+#         echo command to resubmit the job: 
+#         x=`grep slurm.$jIndex.txt ${dFolder}Log/readme`;  
+#         echo ${x/slurm.$jIndex/slurm.$jIndex.1};
+#         echo 
+#     fi 
+# done
+
+
+
+
+
+
+exit 
+
+
+#set -x 
+echo 
+echo Tar error:
+for i in `ls ${dFolder}Log/tar*`; do 
+    echo $i
+    echo last 25 rows:
+    tail -n 25 $i 
+
+    jIndex=${i#*tarError}; jIndex=${jIndex%.txt}
+    if [ -f  ${dFolder}Log/slurm.$jIndex.txt ]; then 
+            echo
+            echo please check ${dFolder}Log/slurm.$jIndex.txt: 
+            echo last 25 rows:
+            tail -n 25 ${dFolder}Log/slurm.$jIndex.txt 
+    else 
+        echo
+        echo job log file not exist. Please check the job
+        
+    fi
+    jID=`grep "/$jIndex on" $runtimeFile`;
+    jID=${jID#submitted }; jID=${jID%/*}; 
+    echo 
+    echo sacct output:
+    sacct --format=JobID,Submit,Start,End,MaxRSS,State,NodeList%30,Partition,ReqTRES%30,TotalCPU,Elapsed%14,Timelimit%14,ExitCode --units=G -j $jID
+    
+    echo 
+    echo command to resubmit the job: 
+    x=`grep slurm.$jIndex.txt ${dFolder}Log/readme`;  
+    echo ${x/slurm.$jIndex/slurm.$jIndex.1};
+    echo 
+done 

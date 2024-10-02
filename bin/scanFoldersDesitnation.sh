@@ -11,19 +11,22 @@ sDir=`realpath $1`
     dDir=${sDir#*datasets/}
     #dFolder=${dFolder#*1TRaw/}
     dDir=${dDir//\//--}
-    mkdir -p $dDir ${dDir}Log
+    mkdir -p ${dDir}LogD
+    [ ! -d "../$dDir" ] && echo Destination folder $dDir for $sDir does not exist && exit 
+
 nJobs="$2"
 
-folders="${dDir}Log/folders.txt"
+folders="${dDir}LogD/folders.txt"
 
 [ -f $folders ] && echo Folder file already exist. Please delete it first: $folders && exit 1
 
-dFolderTmp=$(mktemp -d /n/scratch/users/l/ld32/tmp.XXXXXX)
-tempFile=$(mktemp /n/scratch/users/l/ld32/tmpfile.XXXXXX)
+dFolderTmp=$(mktemp -d) # /n/scratch/users/l/ld32/tmp.XXXXXX)
+tempFile=$(mktemp ) #/n/scratch/users/l/ld32/tmpfile.XXXXXX)
 #tempFile=$(mktemp)
 
 trap "rm -r $dFolderTmp $tempFile $tempFile.txt  $tempFile.*.err $tempFile.*.txt 2>/dev/null" EXIT
 
+sDir=`realpath ../$dDir`
 echo $sDir > "$tempFile.0.txt"
 
 for i in {1..10}; do 
@@ -31,6 +34,8 @@ for i in {1..10}; do
 
     find "$sDir" -mindepth $i -maxdepth $i -type d > "$tempFile" 2>> $tempFile.0.err || echo "scan level $i error shown above" >>$tempFile.0.err
 
+    find "$sDir" -mindepth $i -maxdepth $i -name "*.tar" >> $tempFile.0.txt1 2>> $tempFile.0.err1 || echo "scan level $i error shown above" >>$tempFile.0.err1
+    
     x=$(wc -l < "$tempFile") 
     [ "$x" -lt 200 ] && [ "$x" -gt 0 ] || break
 
@@ -53,6 +58,7 @@ cat "$tempFile" | while IFS= read -r folder; do
     (   #sleep 1
         echo "job $jobID $folder" 
         find "$folder" -type d >> "$tempFile.$jobID.txt" 2>> $tempFile.$jobID.err || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err
+        find "$folder" -name "*.tar" >> "$tempFile.$jobID.txt1" 2>> $tempFile.$jobID.err1 || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err1
         rm -r "$dFolderTmp/lock.$jobID" 
      ) &
 done
@@ -68,14 +74,20 @@ while true; do
 done 
 
 cat  $tempFile.*.txt > $tempFile.txt
+cat  $tempFile.*.txt1 > $tempFile.txt1
 
 cp $tempFile.txt $folders
 
+cp $tempFile.txt1 $folders.tar.txt
+
 cat $tempFile.*.err >&2
 
+cat $tempFile.*.err1 >&2
+
 mkdir -p tmp 
+
 cp $tempFile.* tmp 
 
-echo "All folders found:": 
+#echo "All folders found:": 
 
-cat $folders
+#cat $folders

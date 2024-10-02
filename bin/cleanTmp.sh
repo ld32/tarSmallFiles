@@ -31,6 +31,13 @@ for j in $nodes; do
         if [ \"\$usage\" -gt 10 ]; then
             echo \"Usage is above 10%. Proceeding with deletion.\"
             # Loop through files and directories to be deleted
+
+            # echo -e \"Clean it up? (y)\"
+    
+            # read -p \"\" x </dev/tty
+    
+            [[ "$x" != y ]] && continue
+
             for i in {0..9} {a..z} {A..Z}; do
                 echo \"Deleting /tmp/tmp.\$i*\"
                 rm -rf /tmp/tmp.\$i* 2>/dev/null

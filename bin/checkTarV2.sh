@@ -1,45 +1,95 @@
 #!/bin/bash
 
 #set -x
-
-#set -e
+set -e
 
 function checkArchive() {
     
-    local path="$1"; path="$dFolder${path#$sFolder}"; 
+    echo working on "$1"
+
+   
+    if [ "$(stat -c %Y "$1")" -gt "$(stat -c %Y "$2")" ]; then
+        echo "Error: data updated: $1 is newer than $2."
+    fi
+    return; 
     
+    local path="$2"; local tmpfile=$(mktemp)
+
     #echo working on $1 and $path
     # check folders
-    diff -u <(find "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort) <(find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort) | while read -r line; do
+    local sFolders=$(find "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2> $tmpfile | sort)
+    echo -e "$sFolders"
+    [ -s $tmpfile ] && echo -e "Error: ----------`cat $tmpfile`---------------" && rm $tmpfile  && return 
+    rm $tmpfile
+    #[[ "$?" == 0 ]] || return
+     
+    local dFolders=$(find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort)
+
+    diff -u <(echo -e "$sFolders") <(echo -e "$dFolders") | while read -r line; do
         #echo $line 
         if [[ "$line" =~ ^- && ! "$line" =~ ^--- ]]; then
            
             echo checking folder $1 vs $path
-            echo missing folder: $path/${line:1}
-            echo need rerun: archiveFolder $1/${line:1} 0 
+            echo Error: missing folder: $path/${line:1}
+        
             echo
         elif [[ "$line" =~ ^\+ && ! "$line" =~ ^\+\+\+ ]]; then
            
             echo checking folder $1 and $path
-            echo extra folder: rm $path/${line:1}
+            echo Error: extra folder: $path/${line:1}
+
             echo 
         fi
     done
     
-    local tarFiles=$(tar -tf $path/*.tar 2>/dev/null | sort)
-    local oFiles=$(find -L $1  -maxdepth 1 -mindepth 1 -type f -printf "%P\n" | sort)
+    #local tarFiles=$(tar -tf "$path/*.tar" 2>/dev/null | sort)
+    local tarFiles=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" -print0 2>/dev/null | xargs -0 tar -tf 2>/dev/null | sort)
+    
+    local oFiles=$(find "$1"  -maxdepth 1 -mindepth 1 \( -type f -o -type l \) -printf "%P\n" 2> $tmpfile | sort )
+    [ -s $tmpfile ] && echo -e "Error: ----------`cat $tmpfile`---------------" && rm $tmpfile  && return 
+    rm $tmpfile
 
     # Check files to see if there are differences
     if [ -n "$tarFiles$oFiles" ] && [ -n "$(diff <(echo -e "$oFiles") <(echo -e "$tarFiles"))" ]; then
         echo checking file $1 vs $path
-        ls $path/*.tar 2>/dev/null && echo wrong tar to delete: $path/*.tar $path/*.md5sum 
+        ls $path/*.tar 2>/dev/null && echo Error: wrong tar to delete: $path/*.tar $path/*.md5sum 
         if [ -n "$tarFiles" ]; then 
-            
-            echo files in tar:  $tarFiles       
+            echo files in tar: $tarFiles    
+        else 
+            echo No files were found in tar.   
         fi 
         [ -n "$oFiles" ] &&  echo orignal files: $oFiles 
-        echo need rerun: archiveFolder $1 0 
+        echo Error: need rerun: archiveFolder $1 0 
         echo
+    else 
+    #     echo chmod/own for folders 
+    #     # work on folders 
+    #     local folders1
+    #     local folders2
+    #     mapfile -t folders1 <<< "$sFolders"
+    #     mapfile -t folders2 <<< "$dFolders"
+
+    #     for i in "${!folders1[@]}"; do
+    #         [ -d "$path/${folders2[$i]}" ] || continue 
+    #         chmod "$(stat -c %a "$1/${folders1[$i]}")" "$path/${folders2[$i]}"
+    #         local user=`ls -ld "$1/${folders1[$i]}" | awk '{print $3}'`
+    #         [[ "$user" =~ ^[0-9]+$ ]] && user=wal5
+    
+    #         #local user=$(stat -c %U "$1/${folders1[$i]}")
+    #         chown "$user:htem" "$path/${folders2[$i]}"
+    #     done
+    
+    #    echo chmod/own for files 
+        
+    #     if [ ! -z "$tarFiles" ]; then 
+    #         echo "$tarFiles"
+    #         local owner=`ls -ld "$1" | awk '{print $3}'`
+    #         [[ "$owner" =~ ^[0-9]+$ ]] && owner=wal5
+    #         #local owner=$(stat -c '%U' "$1")
+    #         chmod g+rw "$path/*.tar" "$path/*.md5sum" || true 
+    #         chown $owner:htem $path "$path/*.tar" "$path/*.md5sum" || true
+    #     fi 
+        echo "$1" >> $logDir/foldersPass.$3.txt  
     fi
 }
 
@@ -47,19 +97,13 @@ function checkArchive() {
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return  
 
 usage() {
-    echo "Usage: $0 <sourceFolder> <nJobs>"; exit 1;
+    echo "Usage: $0 <sourceFolder>"; exit 1;
 }
 
 date
 #echo Running $0 $@ 
 
 #set -x  
-
-sFolder=$1
-
-nJobs=$2
-
-action=$3
 
 sFolder=`realpath $1`
 
@@ -88,133 +132,15 @@ mkdir -p $dFolder $logDir
 
 touch $logDir/archive.log
 
-dFolderTmp=`mktemp -d`
-
-trap "rm -r $dFolderTmp" EXIT
-
 startTime=`date`
 
 date >> $logDir/readme
 echo $USER >> $logDir/readme
-echo $0 $sFolder $nScan $nJobs $action | tee -a $logDir/readme
+echo $0 $sFolder | tee -a $logDir/readme
 echo $SLURM_JOB_ID
-
-if [[ "$action" == singleNode ]]; then 
-    if [ -f $logDir/folders.txt ]; then 
-        echo Folder scan is done earlier
-    else     
-        $(dirname $0)/tar.sh $sFolder $nScan $nJobs scan
-    fi 
-    echo nJobs 1 > $logDir/runTime.txt
-    echo 1 start time $(date) >> $logDir/runTime.txt
-    
-    echo 
-    echo Starting to tar using single node 
-    echo 
-    
-    cat $logDir/folders.txt | while IFS= read -r item; do
-        while true; do
-            jobID=0
-            for i in $(seq 1 $nJobs); do
-                if `mkdir $dFolderTmp/lock.$i 2>/dev/null`; then
-                    jobID=$i
-                    break
-                fi
-            done
-            [ "$jobID" -eq 0 ] && sleep 1 || break 
-        done 
-        
-        (   echo -e "\njob $jobID\n$(date)\n$item" 
-            checkArchive "$item" $jobID; 
-            rm -r $dFolderTmp/lock.$jobID; 
-            #echo -e "\njob $jobID\n$(date)\n$item done"
-        ) &
-    done 
-     
-    while true; do 
-      ls $dFolderTmp/lock.* && sleep 30  || break 
-    done 
-
-    echo 1 end time $(date) >> $logDir/runTime.txt
-
-
-    endTime=`date`
-    echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes" | tee -a $logDir/archive.log
-
-    ls $logDir/tarError*.txt 2>/dev/null && exit 1
-
-elif [[ "$action" == sbatch ]]; then 
-
-    if [ -f $logDir/folders.txt ]; then 
-        echo Folder scan is done earlier
-    else     
-        $(dirname $0)/tar.sh $sFolder $nScan $nJobs scan
-    fi 
-
-   
-
-    x=$(wc -l < $logDir/folders.txt) 
-    [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs $nJobs >> $logDir/runTime.txt
-
-    rows_per_job=$(( x / $nJobs ))
-    echo "#!/bin/bash" > $logDir/array.sh 
-    echo >> $logDir/array.sh 
-    echo "#SBATCH -J ${dFolder##*/}._%A_%a" >> $logDir/array.sh 
-    echo "#SBATCH --array=1-$nJobs" >> $logDir/array.sh 
-    echo "#SBATCH --output=$logDir/slurm_%A_%a.out" >> $logDir/array.sh
-    echo >> $logDir/array.sh
-    echo "set -e" >> $logDir/array.sh 
-    echo "echo job index: \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
-    echo "echo \$SLURM_ARRAY_TASK_ID start time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
-    echo "export sFolder=$sFolder" >> $logDir/array.sh
-    echo "export dFolder=$dFolder" >> $logDir/array.sh
-    echo "export logDir=$logDir" >> $logDir/array.sh
-
-    echo "start_row=\$(( (SLURM_ARRAY_TASK_ID - 1) * $rows_per_job + 1 ))" >> $logDir/array.sh 
-    echo "end_row=\$(( SLURM_ARRAY_TASK_ID * $rows_per_job ))"  >> $logDir/array.sh 
-    echo "[ \$SLURM_ARRAY_TASK_ID -eq $nJobs ] && end_row=$x"  >> $logDir/array.sh 
-    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/array.sh
-    echo "source $0" >> $logDir/array.sh
-    echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/array.sh 
-    #echo "  cd \$line || continue" >> $logDir/array.sh
-    #echo "  mkdir -p $dFolder\${line#$sFolder}" >> $logDir/array.sh
-    echo "  checkArchive \"\$line\" \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh     
-    #echo "  checkArchive $dFolder\${line#$sFolder} \$SLURM_ARRAY_TASK_ID" >> $logDir/array.sh 
-    #echo "  exit" >> $logDir/array.sh
-    echo done >> $logDir/array.sh 
-    echo echo done >> $logDir/array.sh
-    echo "echo \$SLURM_ARRAY_TASK_ID end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/array.sh
-    
-    echo "echo -e \"Subject: ${dFolder##*/}/a\$SLURM_ARRAY_TASK_ID/\$SLURM_JOBID is done\n\`summarizeRun.sh $dFolder\`\" | sendmail `head -n 1 ~/.forward` " >> $logDir/array.sh
-    echo sleep 10  >> $logDir/array.sh # wait for email to send out
-    echo "[ -f $logDir/tarError\$SLURM_ARRAY_TASK_ID.txt ] && exit 1" >> $logDir/array.sh 
-
-    echo Slurm script ready: $logDir/array.sh
-    #cat $logDir/array.sh
-    
-    echo sbatch -A rccg -t 12:0:0 -p short --mem 4G $logDir/array.sh
-    output=`sbatch -A rccg  -t 12:0:0 -p short --mem 4G $logDir/array.sh`
-    echo ${output##* } >> $logDir/allJobs.txt
-
-    echo Submitted job ${output##* } >> $logDir/runTime.txt
-    echo $output
-
-    # for i in `seq 2 $nJobs`; do 
-    #     scontrol update jobid=${output##* }_$i jobname=${dFolder##*/}.${output##* }_$i 
-    # done     
-
-    endTime=`date`
-    echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes" | tee -a $logDir/archive.log
-
-    [ -f $logDir/scanError.txt ] && exit 1 
-
-elif [[ "$action" == esbatch ]]; then 
-
-    if [ -f $logDir/folders.txt ]; then 
-        echo Folder scan is done earlier
-    else     
-        $(dirname $0)/tar.sh $sFolder $nScan $nJobs scan 
+    if [ ! -f $logDir/folders.txt ]; then 
+        echo Folder scan is not done yet
+        exit 1
     fi 
 
     #exit; 
@@ -232,24 +158,27 @@ elif [[ "$action" == esbatch ]]; then
     [ -z "$notDone" ] || { echo -e "A run was started earlier on the folder and the folowing jobs are still pending or running\nPlease wait for them to finish or cancel them:\n$notDone"; exit 1; }
 
     # if this is a rerun, use old nJobs
-    if [ -f $logDir/runTime.txt ]; then 
-        x=`grep "^nJobs " $logDir/runTime.txt | tail -n1`
-        x=${x#* }; 
-        [ ! -z "$x" ] && nJobs=$x || echo nJobs $nJobs >> $logDir/runTime.txt
-        cp $logDir/runTime.txt $logDir/runTime.txt.back
-    else 
-        echo nJobs $nJobs >> $logDir/runTime.txt
-    fi
+    # if [ -f $logDir/runTime.txt ]; then 
+    #     x=`grep "^nJobs " $logDir/runTime.txt | tail -n1`
+    #     x=${x#* }; 
+    #     [ ! -z "$x" ] && nJobs=$x || echo nJobs $nJobs >> $logDir/runTime.txt
+    #     cp $logDir/runTime.txt $logDir/runTime.txt.back
+    # else 
+    #     echo nJobs $nJobs >> $logDir/runTime.txt
+    # fi
 
     rm -r $logDir/exclusive $logDir/allJobs.txt  2>/dev/null || true 
 
-    
-
-    [ -f $logDir/runTime.txt ] && cp $logDir/runTime.txt $logDir/runTime.txt.back
+#    [ -f $logDir/runTime.txt ] && cp $logDir/runTime.txt $logDir/runTime.txt.back
 
     x=$(wc -l < $logDir/folders.txt)  
-    [ $x -lt $nJobs ] && nJobs=$x
-    echo nJobs $nJobs >> $logDir/runTime.txt
+
+    rows_per_job=10000
+    nJobs=$(( (x + rows_per_job - 1) / rows_per_job ))
+
+    # x=$(wc -l < $logDir/folders.txt)  
+    # [ $x -lt $nJobs ] && nJobs=$x
+    #echo nJobs $nJobs >> $logDir/runTime.txt
 
     nodeFile=$logDir/sbtachExclusivceLog.txt
 
@@ -261,39 +190,65 @@ elif [[ "$action" == esbatch ]]; then
     
     #[[ "$PWD" == "/n/scratch/users/l/ld32/debug"* ]] && nodeFile=/n/scratch/users/l/ld32/debug/sbatachExclusivceLog.txt
 
-    rows_per_job=$(( x / $nJobs ))
+    #rows_per_job=$(( x / $nJobs ))
+
+     [ -f $logDir/job.sh  ] && mv $logDir/job.sh  $logDir/job.sh.$(stat -c '%.19z' $logDir/job.sh | cut -c 6- | tr " " . | tr ":" "-")
+
     
     echo "#!/bin/bash" > $logDir/job.sh   
     echo >> $logDir/job.sh
     echo "set -e" >> $logDir/job.sh 
-    
+
+    echo "jIndex=\$1" >> $logDir/job.sh
+    echo "echo job index: \$jIndex" >> $logDir/job.sh
+    echo "echo \$jIndex start time \$(date) \$SLURM_JOBID" >> $logDir/job.sh
+
     echo "export sFolder=$sFolder" >> $logDir/job.sh
     echo "export dFolder=$dFolder" >> $logDir/job.sh
     echo "export logDir=$logDir" >> $logDir/job.sh
     
     echo "trap \"rm -r \$logDir/exclusive 2>/dev/null; echo exiting and delete lock; \" EXIT" >> $logDir/job.sh
 
-    echo "jIndex=\$1" >> $logDir/job.sh
-    echo "echo job index: \$jIndex" >> $logDir/job.sh
-    echo "echo \$jIndex start time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/job.sh
+    echo "declare -A file_lines" >> $logDir/job.sh
+
+    #echo "[ -f \$logDir/foldersPass.\$jIndex.txt ] && rm \$logDir/foldersPass.\$jIndex.txt" >> $logDir/job.sh
+  
+    #echo "for file in \`ls \$logDir/foldersPass.\$jIndex.txt 2>/dev/null\`; do" >> $logDir/job.sh
+
+    echo "for file in \`ls \$logDir/foldersPass.*.txt 2>/dev/null\`; do" >> $logDir/job.sh
+    echo "    while IFS= read -r line; do" >> $logDir/job.sh
+    echo "        file_lines[\"\$line\"]=1" >> $logDir/job.sh
+    echo "    done < \"\$file\"" >> $logDir/job.sh
+    echo "done" >> $logDir/job.sh
+    echo "" >> $logDir/job.sh
+
     echo "start_row=\$(( (jIndex - 1) * $rows_per_job + 1 ))" >> $logDir/job.sh 
     echo "end_row=\$(( jIndex * $rows_per_job ))"  >> $logDir/job.sh 
     echo "[ \$jIndex -eq $nJobs ] && end_row=$x"  >> $logDir/job.sh 
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt " >> $logDir/job.sh
     echo "source $0" >> $logDir/job.sh
+
     echo "sed -n \"\${start_row},\${end_row}p\" $logDir/folders.txt  | while IFS= read -r line; do" >> $logDir/job.sh         
-    echo "  checkArchive \"\$line\" \$jIndex" >> $logDir/job.sh 
+    echo "  if [[ -n \"\${file_lines[\"\$line\"]}\" ]]; then" >> $logDir/job.sh
+    echo "    echo \"passed: \$line\"" >> $logDir/job.sh
+    echo "  else" >> $logDir/job.sh
+    echo "    checkArchive \"\$line\" \"\$dFolder\${line#\$sFolder}\" \$jIndex" >> $logDir/job.sh 
+    echo "  fi" >> $logDir/job.sh
     echo done >> $logDir/job.sh 
     echo echo done >> $logDir/job.sh
     
-    echo "echo \$jIndex end time \$(date) \$SLURM_JOBID >> $logDir/runTime.txt" >> $logDir/job.sh 
+    echo "echo \$jIndex end time \$(date) \$SLURM_JOBID" >> $logDir/job.sh 
     
-    echo "if [ -f $logDir/tarError\$jIndex.txt ]; then" >> $logDir/job.sh 
-    echo "  er=\`cat $logDir/tarError\$jIndex.txt\`" >> $logDir/job.sh
-    echo "  echo -e \"Subject: !!! With error: s\$jIndex/\$SLURM_JOBID done ${dFolder##*/}\nPlase check: \$er\" | sendmail `head -n 1 ~/.forward` " >> $logDir/job.sh
-    echo "else" >> $logDir/job.sh 
-    echo "  echo -e \"Subject: s\$jIndex/\$SLURM_JOBID done ${dFolder##*/}\" | sendmail `head -n 1 ~/.forward` " >> $logDir/job.sh
-    echo "fi" >> $logDir/job.sh 
+    #echo "if [ -f $logDir/tarError\$jIndex.txt ]; then" >> $logDir/job.sh 
+    #echo "  er=\`cat $logDir/tarError\$jIndex.txt\`" >> $logDir/job.sh
+    #echo "  echo -e \"Subject: !!! With error: s\$jIndex/\$SLURM_JOBID done ${dFolder##*/}\nPlase check: \$er\" | sendmail `head -n 1 ~/.forward` " >> $logDir/job.sh
+    #echo "else" >> $logDir/job.sh 
+    
+    
+    #echo "  echo -e \"Subject: s\$jIndex/\$SLURM_JOBID done ${dFolder##*/}\" | sendmail `head -n 1 ~/.forward` " >> $logDir/job.sh
+    
+    
+    #echo "fi" >> $logDir/job.sh 
     # remove later
     #echo "sleep 35" >> $logDir/job.sh 
 
@@ -369,7 +324,7 @@ elif [[ "$action" == esbatch ]]; then
 
     echo sleep 10 >> $logDir/job.sh # wait for email to send out
     
-    echo "[ -f $logDir/tarError\$jIndex.txt ] && exit 1" >> $logDir/job.sh 
+    #echo "[ -f $logDir/tarError\$jIndex.txt ] && exit 1" >> $logDir/job.sh 
     
     echo Slurm script:
     echo Slurm script ready: $logDir/job.sh
@@ -377,14 +332,15 @@ elif [[ "$action" == esbatch ]]; then
     for i in `seq 1 $nJobs`; do 
 
         # if done earler, skip it
-        grep "^$i end time" $logDir/runTime.txt && echo Done earlier && continue         
+        [ -f $logDir/slurm.$i.txt ] && grep "^$i end time" $logDir/slurm.$i.txt && echo Done earlier && continue 
+        [ -f $logDir/slurm.$i.1.txt ] && grep "^$i end time" $logDir/slurm.$i.1.txt && echo Done earlier && continue
         
         node=`grep '^com' $nodeFile | grep medium | shuf -n 1 | tr -s " " | cut -f1 | cut -d' ' -f1`
         
         #node=compute-a-16-21
 
-        if [ -z "$node" ]; then
-            cmd="sbatch -A rccg --qos=testbump -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -H -p medium --mem 2G $logDir/job.sh $i" 
+        if [ -z "$node" ]; then                                                             # -H
+            cmd="sbatch -A rccg --qos=testbump -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -H -t 48:0:0 -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
@@ -392,7 +348,7 @@ elif [[ "$action" == esbatch ]]; then
             echo holdit medium `date '+%m-%d %H:%M:%S'` job $i: ${output##* } >> $nodeFile
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i >> $logDir/runTime.txt
-        else
+        else          # -w $node 
             cmd="sbatch -w $node --qos=testbump -c 1 -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 48:0:0 -p medium --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
@@ -403,19 +359,19 @@ elif [[ "$action" == esbatch ]]; then
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i on $node >> $logDir/runTime.txt
         fi
-    
-        sleep 1
+        
+        sleep 0.5
     done
     cat $nodeFile >&2
 
     endTime=`date`
     echo "Time used: $((($(date -d "$endTime" '+%s') - $(date -d "$startTime" '+%s'))/60)) minutes" | tee -a $logDir/archive.log
 
-    if [ -f $logDir/scanError.txt ]; then 
-        echo Sending scan fail email...
-        echo -e "Subject: !!! Scan error: $dFolder\nPlease check: $logDir/scanError.txt\n`cat $logDir/scanError.txt`" | sendmail `head -n 1 ~/.forward`
-        exit 1 
-    fi
-else 
-    echo action wrong: $action; usage;
-fi
+    # if [ -f $logDir/checkError.txt ]; then 
+    #     echo Sending scan fail email...
+    #     echo -e "Subject: !!! checkTar error: $dFolder\nPlease check: $logDir/checkError.txt\n`cat $logDir/checkError.txt`" | sendmail `head -n 1 ~/.forward`
+    #     exit 1 
+    # fi
+#else 
+#    echo action wrong: $action; usage;
+#fi

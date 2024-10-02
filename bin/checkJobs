@@ -47,7 +47,7 @@ else
     fi 
 
     if [ -z "$notDone$notDone1" ]; then 
-        echo All jobs are done +++++++++++++++++++++++++
+        echo No job running for this folder +++++++++++++++++++++++++
     else 
         echo -e "A run was started earlier on the folder and the folowing jobs are still pending or running\nDo you want to cancel them (y)?\nRunning: $notDone\nPending: $notDone1"; 
         read -p "" x </dev/tty
@@ -61,7 +61,7 @@ else
     fi
 fi
 wc -l ${1}Log/folders.txt
-wc -l ${1}Log01/folders.txt
+#wc -l ${1}Log01/folders.txt
 
 echo "Do you want to resubmit jobs for the folder (yy)"? 
 read -p "" x </dev/tty

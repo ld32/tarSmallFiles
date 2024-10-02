@@ -14,13 +14,18 @@
 
 
 
-
+folderListFile=$1
+[ ! -f $folderListFile ] && echo "need fodler list file" && exit
 
 
 IFS=$'\n'; export out=`squeue -u $USER -t PD,R -o "%.18i %.2t"`
 
-for dFolder in `cat allDFolders.txt `; do 
+for dFolder in `cat $folderListFile `; do 
     #dFolder=aaronsBrain--sections
+    
+
+    [ -f ${dFolder}Log/runTime.txt ] || continue 
+    
     summarizeRun $dFolder;  
 
     checkJobs $dFolder; 
