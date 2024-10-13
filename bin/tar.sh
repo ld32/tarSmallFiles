@@ -5,23 +5,38 @@
 #set -e
 
 function archiveFiles() {
-    
-    echo working on $1
-    
+
+    echo working on $1 
+
     local path="$1"; path="$dFolder${path#$sFolder}"; 
 
-    rm "$path"/*.tar "$path"/*.md5sum 2>/dev/null || true 
+    #rm "$path"/*.tar "$path"/*.md5sum 2>/dev/null || true 
 
-    #ls "$path"/*.tar >/dev/null 2>&1 && echo Tar done earlier && return
+    # if result=$(find "$path" -maxdepth 1 -name "*.tar" -mtime -7 -print -quit 2>/dev/null) && [ -n "$result" ]; then
+    #     echo "Tar file exists and is newer than 7 days."
+    #     return  
+    # fi
 
-    mkdir -p "$path" || { echo Error: make folder $path | tee -a  $logDir/tarError$2.txt; }
+    #rm "$path"/*.tar "$path"/*.md5sum 2>/dev/null || true 
+     
+    ls "$path"/*.tar >/dev/null 2>&1 && echo Tar done earlier && return
 
     cd "$1" || { echo Error: cd folder failed $1 | tee -a  $logDir/tarError$2.txt; return; } 
+
+    if [ -d "$path" ]; then
+        echo Folder exists: $path 
+    else 
+        mkdir  "$path" && echo "$1" >> $logDir/foldersPassMkdir.$2.txt || { echo Error: make folder $path | tee -a  $logDir/tarError$2.txt; return; }
+    fi 
 
     local tmp=$(mktemp $dFolderTmp/tmp.XXXXXX) # && printf "%s\n" "${files[@]}" > $tmp.list
 
     # only file name without folder name
     local files=(`find . -maxdepth 1 -mindepth 1 \( -type f -o -type l \) -printf "%f\n" | sort -n | tee $tmp.list`) || { echo Error: find file error for folder $1 | tee -a  $logDir/tarError$2.txt; return; } 
+
+    #local files=(`find . -maxdepth 1 -mindepth 1 \( -type f -o -type l \) -printf "%f\n" | tee $tmp.list`) || { echo Error: find file error for folder $1 | tee -a  $logDir/tarError$2.txt; return; } 
+
+    cat $tmp.list 
 
     # get full path 
     #local files=`find -L $1 -maxdepth 1 -mindepth 1 -type f | sort -n` ||  touch $dFolderTmp/lock.err
@@ -34,10 +49,10 @@ function archiveFiles() {
     #files=($files) 
     #local item=$(basename ${files[0]})-$(basename ${files[-1]})
 
-    local item=`echo ${files[0]}-${files[-1]} | sed 's/[^a-zA-Z0-9]/_/g'`
+    local item=`echo ${files[0]}-${files[-1]} | sed 's/[^a-zA-Z0-9]/_/g'`; item="${item#-}"
 
     # todo: filename might too long
-     length=${#item}
+    length=${#item}
     
     # Check if the length exceeds the maximum length
     if [ "$length" -gt "25" ]; then
@@ -49,6 +64,7 @@ function archiveFiles() {
 
     # somehow -C and -T are not compatible, so we have to remove -C, and use full path for file list
     #tar --create --preserve-permissions --file "$tmp" -T $tmp.list -C $1 ||  touch $dFolderTmp/lock.err
+    sed -i 's|^-|./-|' $tmp.list; 
 
     tar --create --preserve-permissions --file "$tmp" -T $tmp.list || { rm $tmp $tmp.list; echo Error: tar $1 | tee -a $logDir/tarError$2.txt; return; } 
     
@@ -56,7 +72,7 @@ function archiveFiles() {
     
     echo "$checkSum $item.tar" > "$path/$item.md5sum" || { echo Error: checksum1 $1| tee -a $logDir/tarError$2.txt; return; } 
  
-    cp "$tmp" "$path/$item.tar" || { echo Error: cp .tar for $1 | tee -a  $logDir/tarError$2.txt; return; } 
+    rsync -a "$tmp" "$path/$item.tar"  && echo "$1" >> $logDir/foldersPassTar.$2.txt  || { echo Error: cp .tar for $1 | tee -a  $logDir/tarError$2.txt; return; } 
     
     rm -r $tmp $tmp.list
 }
@@ -71,9 +87,7 @@ usage() {
 date
 #echo Running $0 $@ 
 
-#set -x  
-
-sFolder=$1
+#set -x 
 
 #nJobs=$2
 
@@ -100,7 +114,7 @@ sFolder=`realpath $1`
 
 [ ! -d "$sFolder" ] && echo Source folder not exist: $sFolder && usage
 
-logDir=${dFolder}Log
+logDir=${dFolder}LogT
 
 mkdir -p $dFolder $logDir
 
@@ -182,7 +196,7 @@ elif [[ "$action" == esbatch ]]; then
 
     x=$(wc -l < $logDir/folders.txt)  
 
-    rows_per_job=1000
+    rows_per_job=10000
     nJobs=$(( (x + rows_per_job - 1) / rows_per_job ))
 
     #[ $x -lt $nJobs ] && nJobs=$x
@@ -203,7 +217,7 @@ elif [[ "$action" == esbatch ]]; then
 
     echo "#!/bin/bash" > $logDir/job.sh   
     echo >> $logDir/job.sh
-    echo "set -e" >> $logDir/job.sh 
+    #echo "set -e" >> $logDir/job.sh 
     
     echo "export sFolder=$sFolder" >> $logDir/job.sh
     echo "export dFolder=$dFolder" >> $logDir/job.sh
@@ -338,28 +352,29 @@ elif [[ "$action" == esbatch ]]; then
         
         #node=compute-a-16-21
 
-        if [ -z "$node" ]; then
-            cmd="sbatch -A rccg --qos=testbump -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -H -p short --mem 2G $logDir/job.sh $i" 
+        if [ -z "$node" ]; then                                                             # -H 
+            cmd="sbatch -A rccg --qos=testbump -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
             echo $output
-            echo holdit short `date '+%m-%d %H:%M:%S'` job $i: ${output##* } >> $nodeFile
+            #echo holdit short `date '+%m-%d %H:%M:%S'` job $i: ${output##* } >> $nodeFile
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i >> $logDir/runTime.txt
-        else
-            cmd="sbatch -w $node --qos=testbump -c 1 -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
+        else        # -w $node
+            cmd="sbatch  --qos=testbump -c 1 -A rccg -o $logDir/slurm.$i.txt -J ${dFolder##*/}.$i -t 12:0:0 -p short --mem 2G $logDir/job.sh $i" 
             echo Submitting job:
             echo $cmd | tee -a $logDir/readme
             output="$(eval $cmd)"
             echo $output
             sed -i "s/^${node}/o${node}/" $nodeFile
-            echo submit short `date '+%Y-%m-%d %H:%M:%S'` job $i: ${output##* } on: ${node}spaceHolder${output##* } >> $nodeFile
+            #echo submit short `date '+%Y-%m-%d %H:%M:%S'` job $i: ${output##* } on: ${node}spaceHolder${output##* } >> $nodeFile
             echo ${output##* } >> $logDir/allJobs.txt
             echo submitted ${output##* }/$i on $node >> $logDir/runTime.txt
         fi
     
         sleep 1
+        #break 
     done
     cat $nodeFile >&2
 

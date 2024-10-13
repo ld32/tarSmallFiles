@@ -11,6 +11,9 @@ sDir=`realpath $1`
     dDir=${sDir#*datasets/}
     #dFolder=${dFolder#*1TRaw/}
     dDir=${dDir//\//--}
+
+   [[ "$dDir" == *datasets ]] && dDir=smallFolders     
+
     mkdir -p ${dDir}LogD
     [ ! -d "../$dDir" ] && echo Destination folder $dDir for $sDir does not exist && exit 
 
@@ -34,7 +37,7 @@ for i in {1..10}; do
 
     find "$sDir" -mindepth $i -maxdepth $i -type d > "$tempFile" 2>> $tempFile.0.err || echo "scan level $i error shown above" >>$tempFile.0.err
 
-    find "$sDir" -mindepth $i -maxdepth $i -name "*.tar" >> $tempFile.0.txt1 2>> $tempFile.0.err1 || echo "scan level $i error shown above" >>$tempFile.0.err1
+    find "$sDir" -mindepth $i -maxdepth $i -name "*.tar" -printf "%s %p\n" >> $tempFile.0.txt1 2>> $tempFile.0.err1 || echo "scan level $i error shown above" >>$tempFile.0.err1
     
     x=$(wc -l < "$tempFile") 
     [ "$x" -lt 200 ] && [ "$x" -gt 0 ] || break
@@ -58,7 +61,7 @@ cat "$tempFile" | while IFS= read -r folder; do
     (   #sleep 1
         echo "job $jobID $folder" 
         find "$folder" -type d >> "$tempFile.$jobID.txt" 2>> $tempFile.$jobID.err || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err
-        find "$folder" -name "*.tar" >> "$tempFile.$jobID.txt1" 2>> $tempFile.$jobID.err1 || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err1
+        find "$folder" -name "*.tar" -printf "%s %p\n" >> "$tempFile.$jobID.txt1" 2>> $tempFile.$jobID.err1 || echo "scan job $jobID error shown above" >> $tempFile.$jobID.err1
         rm -r "$dFolderTmp/lock.$jobID" 
      ) &
 done

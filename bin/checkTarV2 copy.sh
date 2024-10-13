@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#set -x
-#set -e
+set -x
+set -e
 
 function checkArchive() {
     
@@ -17,45 +17,43 @@ function checkArchive() {
 
     #echo working on $1 and $path
     # check folders
-    # local sFolders=$(find "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2> $tmpfile | sort)
-    # echo -e "$sFolders"
+    local sFolders=$(find "$1" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2> $tmpfile | sort)
+    echo -e "$sFolders"
 
-    # [ -s $tmpfile ] && echo -e "Error: ----------`cat $tmpfile`---------------" && rm $tmpfile  && return 
+    [ -s $tmpfile ] && echo -e "Error: ----------`cat $tmpfile`---------------" && rm $tmpfile  && return 
     
-    # rm $tmpfile
-    # #[[ "$?" == 0 ]] || return
+    rm $tmpfile
+    #[[ "$?" == 0 ]] || return
      
-    # # Using command grouping to ignore errors
-    # local dFolders=$({ find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null || true; } | sort)
+    # Using command grouping to ignore errors
+    local dFolders=$({ find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null || true; } | sort)
 
-    # local folderMatch="y"
+    local folderMatch="y"
 
-    # while read -r line; do
-    #     if [[ "$line" == "-" || "$line" == "+" ]]; then 
-    #         echo 
-    #     elif [[ "$line" =~ ^- && ! "$line" =~ ^--- ]]; then
-    #         echo checking folder $1 vs $path
-    #         echo Error: missing folder: $path/${line:1}, please work on: $1/${line:1}
-    #         echo
-    #     elif [[ "$line" =~ ^\+ && ! "$line" =~ ^\+\+\+ ]]; then
-    #         echo checking folder $1 and $path
-    #         echo Error: extra folder: $path/${line:1}
-    #         echo 
-    #     fi
-    #     folderMatch=""
-    # done < <(diff -u <(echo -e "$sFolders") <(echo -e "$dFolders"))
+    while read -r line; do
+        if [[ "$line" == "-" || "$line" == "+" ]]; then 
+            echo 
+        elif [[ "$line" =~ ^- && ! "$line" =~ ^--- ]]; then
+            echo checking folder $1 vs $path
+            echo Error: missing folder: $path/${line:1}, please work on: $1/${line:1}
+            echo
+        elif [[ "$line" =~ ^\+ && ! "$line" =~ ^\+\+\+ ]]; then
+            echo checking folder $1 and $path
+            echo Error: extra folder: $path/${line:1}
+            echo 
+        fi
+        folderMatch=""
+    done < <(diff -u <(echo -e "$sFolders") <(echo -e "$dFolders"))
 
     
     #local tarFiles=$(tar -tf "$path/*.tar" 2>/dev/null | sort)
     local tars=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" | sort)
     local count=$(echo -e "$tars" | wc -l)
-
-    [ "$count" -eq 0 ] && echo -e "Error: missing tars: for $i and $path"
     
     [ "$count" -gt 1 ] && echo -e "Error: multiple tars: $tars for $i and $path" && tars=$(echo -e "$tars" | head -n 1)
 
     #local tarFiles=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" ! -name ".*" -print0 | head -zn 1 2>/dev/null | xargs -0 tar -tf 2>/dev/null | sort)
-    return 
+    
     local tarFiles=$(tar -tf "$tars" 2>/dev/null | sed 's|^\./||' | sort)
 
     local oFiles=$(find "$1"  -maxdepth 1 -mindepth 1 \( -type f -o -type l \) -printf "%P\n" 2> $tmpfile | sort )
@@ -102,7 +100,7 @@ function checkArchive() {
     #         chmod g+rw "$path/*.tar" "$path/*.md5sum" || true 
     #         chown $owner:htem $path "$path/*.tar" "$path/*.md5sum" || true
     #     fi 
-       [ -z "$folderMatch" ] &&  echo "$1" >> $logDir/foldersPass.$3.txt  || return 
+       [ -z "$folderMatch" ] &&  echo "$1" >> $logDir/foldersPass.$3.txt  
     fi
 }
 
@@ -186,7 +184,7 @@ echo $SLURM_JOB_ID
 
     x=$(wc -l < $logDir/folders.txt)  
 
-    rows_per_job=10000
+    rows_per_job=1000
     nJobs=$(( (x + rows_per_job - 1) / rows_per_job ))
 
     # x=$(wc -l < $logDir/folders.txt)  
@@ -210,7 +208,7 @@ echo $SLURM_JOB_ID
     
     echo "#!/bin/bash" > $logDir/job.sh   
     echo >> $logDir/job.sh
-    #echo "set -e" >> $logDir/job.sh 
+    echo "set -e" >> $logDir/job.sh 
 
     echo "jIndex=\$1" >> $logDir/job.sh
     echo "echo job index: \$jIndex" >> $logDir/job.sh

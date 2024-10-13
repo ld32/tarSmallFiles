@@ -5,11 +5,15 @@
 
 dFolder="$1"
 
+
+
 echo 
 echo -------------------------------------------------- 
-echo ${dFolder}Log
+echo ${dFolder}LogT
+
+[ -d $dFolder ] || exit
 #dFolder=aaronsBrain--sections
-    logDir=${dFolder}Log
+    logDir=${dFolder}LogT
 
     x=$(wc -l < $logDir/folders.txt)  
 
@@ -38,7 +42,7 @@ echo ${dFolder}Log
         fi 
     else 
         echo $count of $nJobs are done. 
-        checkJobs $dFolder; 
+        checkJobsT $dFolder; 
         
     fi 
 

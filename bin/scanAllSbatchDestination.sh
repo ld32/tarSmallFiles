@@ -14,9 +14,11 @@ for i in `cat allDFolders.txt`; do
 
     dDir=${dDir//\//--}
 
-    [ -f ${dDir}LogD/folders.txt ] || echo no
+    [[ "$dDir" == *datasets ]] && dDir=smallFolders 
 
-    [ -d  ${dDir}LogD ] && continue
+    [ -f ${dDir}LogD/folders.txt ] && continue 
+
+    #[ -d  ${dDir}LogD ] && continue
 
     #echo -e "Submit job?(y)"
         
@@ -25,10 +27,10 @@ for i in `cat allDFolders.txt`; do
         
     #[[ "$x" == y ]] || continue
 
-    mkdir  ${dDir}LogD && scanFoldersDesitnation.sh $i 5 > ${dDir}LogD/$dDir.scan.log 2>&1
+    mkdir -p ${dDir}LogD && scanFoldersDesitnation.sh $i 5 > ${dDir}LogD/$dDir.scan.log 2>&1
     
     #sbatch -A rccg --qos=testbump -o ${dDir}Log/$dDir.scan.log -J scan.$dDir -t 72:0:0 -p medium --mem 4G -c 2  --wrap="scanFolders.sh $i 5"; 
 
-    sleep 600
+    sleep 60
 done 
 

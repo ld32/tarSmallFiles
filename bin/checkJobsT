@@ -1,0 +1,81 @@
+#!/bin/bash
+
+#set -x
+
+dFolder="$1"
+
+
+[ -d $dFolder ] || exit
+
+# if [ "$dFolder" == /* ]; then 
+
+#     [ ! -d "$dFolder" ] && echo Source folder not exist: $dFolder && usage
+
+#     dFolder=`realpath $1`
+
+
+#     dFolder=${dFolder#*datasets/}
+#     #dFolder=${dFolder#*1TRaw/}
+#     dFolder=${dFolder//\//--}
+    
+#     runtimeFile=${dFolder}LogT/runTime.txt
+# else 
+
+    runtimeFile=${dFolder}LogT/runTime.txt
+# fi 
+
+# [ -z $2 ] || runtimeFile=$2 
+
+if [ ! -f ${dFolder}LogT/allJobs.txt ]; then 
+    echo Job file not exist: ${dFolder}LogT/allJobs.txt 
+    echo Usage: $0 destinationFolder; 
+else 
+    notDone=''; notDone1=''
+    if [ -f ${dFolder}LogT/allJobs.txt ]; then 
+        [ -z "$out" ] &&  IFS=$'\n' &&  out=`squeue -u $USER -t PD,R -o "%.18i %.2t"`
+        if [ ! -z "$out" ]; then 
+            R=`echo -e "$out" | grep " R"`
+            P=`echo -e "$out" | grep " PD"`
+            
+
+            for line in `cat ${dFolder}LogT/allJobs.txt`; do
+                [[ "$R" == *$line* ]] && notDone="$line $notDone"
+            done 
+            for line in `cat ${dFolder}LogT/allJobs.txt`; do
+                [[ "$P" == *$line* ]] && notDone1="$line $notDone1"
+            done 
+
+        fi     
+    fi 
+
+    if [ -z "$notDone$notDone1" ]; then 
+        echo No job running for this folder +++++++++++++++++++++++++
+    else 
+        echo -e "A run was started earlier on the folder and the folowing jobs are still pending or running\nDo you want to cancel them (y)?\nRunning: $notDone\nPending: $notDone1"; 
+        read -p "" x </dev/tty
+        if [[ "$x" == y ]]; then 
+            IFS=' ' 
+            for id in $notDone $notDone1; do 
+                echo $id; scancel $id 
+                sleep 0.5
+            done
+        fi 
+    fi
+fi
+wc -l ${1}LogT/folders.txt
+#wc -l ${1}Log01/folders.txt
+
+echo "Do you want to resubmit jobs for the folder (yy)"? 
+read -p "" x </dev/tty
+if [[ "$x" == yy ]]; then 
+    #echo "Are you sure (yyy)"? 
+    #read -p "" x </dev/tty
+    #if [[ "$x" == yyy ]]; then 
+        #dFolder=hostname
+        grep " \-J $dFolder " sbatchCommandsT.txt | while read -r line; do
+            eval "$line"
+        done
+    #fi
+fi
+
+echo 

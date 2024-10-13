@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #set -x
-set -e
+#set -e
 
 function checkArchive() {
     
-    echo working on "$1"
+    echo working on "$1" vs $2
     
     local path="$2"; local tmpfile=$(mktemp)
 
@@ -17,9 +17,9 @@ function checkArchive() {
     rm $tmpfile
     #[[ "$?" == 0 ]] || return
      
-    local dFolders=$({ find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null || true; } | sort)
+   local dFolders=$({ find "$path" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null || true; } | sort)
 
-   local folderMatch="y"
+     local folderMatch="y"
 
      while read -r line; do
         if [[ "$line" == "-" || "$line" == "+" ]]; then 
@@ -38,8 +38,15 @@ function checkArchive() {
 
     
     #local tarFiles=$(tar -tf "$path/*.tar" 2>/dev/null | sort)
-    local tarFiles=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" -print0 2>/dev/null | xargs -0 tar -tf 2>/dev/null | sort)
+    local tars=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" | sort)
+    local count=$(echo -e "$tars" | wc -l)
     
+    [ "$count" -gt 1 ] && echo -e "Error: multiple tars: $tars for $i and $path" && tars=$(echo -e "$tars" | head -n 1)
+
+    #local tarFiles=$(find "$path" -maxdepth 1 -mindepth 1 -name "*.tar" ! -name ".*" -print0 | head -zn 1 2>/dev/null | xargs -0 tar -tf 2>/dev/null | sort)
+    
+    local tarFiles=$(tar -tf "$tars" 2>/dev/null | sed 's|^\./||' | sort)
+
     local oFiles=$(find "$1"  -maxdepth 1 -mindepth 1 \( -type f -o -type l \) -printf "%P\n" 2> $tmpfile | sort )
     [ -s $tmpfile ] && echo -e "Error: ----------`cat $tmpfile`---------------" && rm $tmpfile  && return 
     rm $tmpfile
@@ -54,20 +61,21 @@ function checkArchive() {
             echo No files were found in tar.   
         fi 
         [ -n "$oFiles" ] &&  echo orignal files: $oFiles 
-        echo Error: need rerun: archiveFolder $1 0 
-        echo 
-    else
-       [ -z "$folderMatch" ] &&  echo Pass: "$1"
+        echo Error: need rerun: archiveFolder $1 0 for $path
+        echo
+    else 
+    
+        [ -z "$folderMatch" ] &&  echo pass "$1"  
     fi
 }
 
 [ ! -f "$1" ] && echo Folder list not found && exit
 
-while IFS= read -r sFolder; do
-    #sFolder="/n/data3/hms/neurobio/htem/$sFolder"
+while IFS= read -r sFolder; do  #/n/htem/.snapshot/o2_groups_htem_daily_2024-10-07_23-45/temcagt/datasets/cb2/intersection/cmaps
+    sFolder="/n/groups/htem/$sFolder"
     dFolder=${sFolder#*datasets/}
     tmp=${dFolder%%/*}   # first level folder
-     x=''
+    x=''
     if [ -d "$tmp" ]; then 
         dFolder=$tmp #`realpath $tmp` 
     else 
@@ -92,21 +100,14 @@ while IFS= read -r sFolder; do
         fi 
 
     fi 
-    if [[ "$x" == smallFolders ]]; then  
-        checkArchive $sFolder /n/data3_vast/data3_datasets/ld32/.snapshot/data3_2024-10-08_16_00_03_UTC/${dFolder//\//--} 
-        
-    else
-        checkArchive $sFolder /n/data3_vast/data3_datasets/ld32/.snapshot/data3_2024-10-08_16_00_03_UTC/${dFolder//\//--}/${sFolder#*$dFolder}
-    fi  
 
     if [[ "$x" == smallFolders ]]; then  
         checkArchive $sFolder /n/data3_vast/groups_datasets/ld32/smallFolders/${sFolder#*datasets/}
         
     else
         checkArchive $sFolder /n/data3_vast/groups_datasets/ld32/${dFolder//\//--}/${sFolder#*$dFolder/}
-    fi    
-
-    #break 
+    fi      
+    break 
 done < <(cat $1)
 
 echo done 
